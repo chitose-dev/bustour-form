@@ -62,11 +62,6 @@
             <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
             <h2 class="text-2xl font-bold mb-6">お客様情報の入力</h2>
 
-            <!-- 自動入力ボタン（キャッシュがある場合のみ表示） -->
-            <button type="button" id="btn-auto-fill" onclick="showAutoFillDialog()" class="hidden w-full bg-blue-100 text-blue-800 border-2 border-blue-200 font-bold py-3 rounded-lg mb-8 text-lg flex items-center justify-center gap-2">
-                <span>🔄</span> 前回の情報を自動入力
-            </button>
-
             <form id="booking-form" onsubmit="event.preventDefault(); submitUserInfo();">
                 <div class="mb-6">
                     <label class="block text-lg font-bold mb-2">お名前 <span class="text-red-500">*</span></label>
@@ -361,27 +356,19 @@
             
             // 座席指定UI初期化
             setupPreferredSeatsUI();
-            
-            // 自動入力ボタンの表示/非表示をチェック
-            checkAutoFillCache();
         });
 
         // ---------------------------------
-        // 自動入力キャッシュチェック
+        // 自動入力キャッシュチェック（自動ダイアログ表示）
         // ---------------------------------
         function checkAutoFillCache() {
             const saved = localStorage.getItem('user_profile_cache');
-            const btn = document.getElementById('btn-auto-fill');
             
             if (saved) {
-                // キャッシュがある場合：ボタンを表示
-                btn.classList.remove('hidden');
-                btn.classList.add('flex');
-            } else {
-                // キャッシュがない場合：ボタンを非表示
-                btn.classList.add('hidden');
-                btn.classList.remove('flex');
+                // キャッシュがある場合：自動でダイアログ表示
+                showAutoFillDialog();
             }
+            // キャッシュがない場合：何もしない
         }
 
         // ---------------------------------
@@ -484,11 +471,6 @@
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
             window.scrollTo(0, 0);
-            
-            // B-03画面に遷移時、自動入力ボタンの表示状態を更新
-            if (screenId === 'screen-b03') {
-                checkAutoFillCache();
-            }
         }
 
         // B-01 -> B-02
@@ -509,6 +491,9 @@
             cache.passengers = parseInt(document.getElementById('input-passengers').value) || 1;
             setupPreferredSeatsUI();
             goTo('screen-b03');
+            
+            // キャッシュがあれば自動でダイアログ表示
+            checkAutoFillCache();
         }
 
         // ---------------------------------
