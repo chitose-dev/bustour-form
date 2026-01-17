@@ -1,0 +1,39 @@
+@charset "UTF-8";
+
+/* ベースフォント調整 */
+body {
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+}
+
+/* サイドバーのアクティブなタブ */
+.active-nav {
+    background-color: #374151; /* gray-700 */
+    color: #FACC15; /* primary yellow */
+    border-right: 4px solid #FACC15;
+}
+
+/* テーブルの行ホバー */
+tbody tr:hover {
+    background-color: #F9FAFB; /* gray-50 */
+}
+
+/* スクロールバーのカスタマイズ (Webkit) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+}
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1; 
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8; 
+}
+
+/* モーダルのアニメーション */
+.modal-overlay {
+    transition: opacity 0.2s ease-in-out;
+}

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>予約管理システム - プロトタイプ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FACC15', /* 黄色 */
+                        'primary-hover': '#EAB308',
+                        text: '#000000',
+                        bg: '#FFFFFF',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: "Helvetica Neue", Arial, sans-serif; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        /* 入力要素の文字サイズ調整 */
+        input, select, textarea { font-size: 1.125rem; } 
+    </style>
+</head>
+<body class="bg-gray-100 text-black antialiased">
+
+    <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg relative pb-10">
+        
+        <header class="bg-primary p-4 text-center font-bold text-xl shadow-sm sticky top-0 z-10">
+            バスツアー予約
+        </header>
+
+        <div id="screen-b01" class="screen active p-4">
+            <h2 class="text-xl font-bold text-center mb-6">2026年 3月</h2>
+            <div class="grid grid-cols-7 gap-2 text-center mb-2 font-bold text-gray-600">
+                <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
+            </div>
+            
+            <div class="grid grid-cols-7 gap-2 text-center">
+                <div class="h-14"></div><div class="h-14"></div>
+                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">1</div>
+                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">2</div>
+                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">..</div>
+                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">14</div>
+                
+                <button onclick="selectDate('2026-03-15')" class="col-start-1 h-14 bg-white border-2 border-primary text-black font-bold flex items-center justify-center rounded shadow-sm hover:bg-yellow-50">
+                    15
+                </button>
+                
+                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">16</div>
+            </div>
+            <p class="mt-6 text-sm text-gray-500 text-center">※グレーの日付は選択できません</p>
+        </div>
+
+        <div id="screen-b02" class="screen p-4">
+            <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 日付を変更</button>
+            <h2 class="text-xl font-bold mb-4" id="view-date-title">--月--日のツアー</h2>
+
+            <div class="border rounded-xl overflow-hidden shadow-md mb-6">
+                <div class="bg-gray-300 h-48 w-full flex items-center justify-center text-gray-500 font-bold">
+                    ツアー画像
+                </div>
+                <div class="p-4">
+                    <h3 class="text-xl font-bold mb-2">春の九州・温泉めぐり</h3>
+                    <p class="text-gray-700 mb-4 text-lg">大分・熊本の名湯を巡る旅。</p>
+                    <div class="flex justify-between items-end">
+                        <span class="text-2xl font-bold">¥12,000</span>
+                        <button onclick="selectTour('春の九州・温泉めぐり', 12000)" class="bg-primary hover:bg-primary-hover text-black font-bold py-3 px-8 rounded-lg text-lg shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
+                            選択する
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="screen-b03" class="screen p-4">
+            <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
+            <h2 class="text-2xl font-bold mb-6">お客様情報の入力</h2>
+
+            <button onclick="tryAutoFill()" class="w-full bg-blue-100 text-blue-800 border-2 border-blue-200 font-bold py-3 rounded-lg mb-8 text-lg flex items-center justify-center gap-2">
+                <span>🔄</span> 前回の情報を自動入力
+            </button>
+
+            <form id="booking-form" onsubmit="event.preventDefault(); submitUserInfo();">
+                <div class="mb-6">
+                    <label class="block text-lg font-bold mb-2">お名前 <span class="text-red-500">*</span></label>
+                    <input type="text" id="input-name" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-gray-50" required>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-lg font-bold mb-2">電話番号 <span class="text-red-500">*</span></label>
+                    <input type="tel" id="input-phone" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-gray-50" required>
+                </div>
+
+                <div class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <p class="font-bold text-lg mb-4 border-b pb-2">ご住所 <span class="text-red-500">*</span></p>
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold mb-1 text-gray-600">郵便番号</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="input-zip" class="w-1/2 border-2 border-gray-300 p-3 rounded-lg bg-white">
+                            <button type="button" class="w-1/2 bg-gray-200 text-black font-bold rounded-lg border-2 border-gray-300 text-sm">住所検索</button>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold mb-1 text-gray-600">都道府県</label>
+                        <select id="input-pref" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white h-14">
+                            <option value="">選択してください</option>
+                            <option value="東京都">東京都</option>
+                            <option value="神奈川県">神奈川県</option>
+                            <option value="埼玉県">埼玉県</option>
+                            </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold mb-1 text-gray-600">市区町村</label>
+                        <input type="text" id="input-city" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white">
+                    </div>
+                    <div class="mb-0">
+                        <label class="block text-sm font-bold mb-1 text-gray-600">番地・建物名</label>
+                        <input type="text" id="input-street" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white">
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-lg font-bold mb-2">参加人数</label>
+                    <select id="input-passengers" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white text-lg">
+                        <option value="1">1名</option>
+                        <option value="2">2名</option>
+                        <option value="3">3名</option>
+                        <option value="4">4名</option>
+                    </select>
+                </div>
+
+                <div class="mb-8 flex items-center bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <input type="checkbox" id="consent-next" class="w-6 h-6 text-primary border-gray-300 rounded focus:ring-primary">
+                    <label for="consent-next" class="ml-3 text-lg font-bold">次回もこの情報を使う</label>
+                </div>
+
+                <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-xl shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
+                    次へ進む
+                </button>
+            </form>
+        </div>
+
+        <div id="screen-b04" class="screen p-4">
+            <button onclick="goTo('screen-b03')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
+            <h2 class="text-2xl font-bold mb-6">乗車場所の選択</h2>
+            
+            <p class="mb-4 font-bold text-lg" id="pickup-count-label">参加人数：--名</p>
+
+            <div id="pickup-mode-selector" class="hidden mb-6 flex-col gap-4">
+                <label class="flex items-center p-4 border rounded-lg bg-white cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-yellow-50 transition">
+                    <input type="radio" name="pickup_mode" value="same" class="w-6 h-6" checked onchange="renderPickupDropdowns()">
+                    <span class="ml-3 text-lg font-bold">全員同じ場所から乗車</span>
+                </label>
+                <label class="flex items-center p-4 border rounded-lg bg-white cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-yellow-50 transition">
+                    <input type="radio" name="pickup_mode" value="individual" class="w-6 h-6" onchange="renderPickupDropdowns()">
+                    <span class="ml-3 text-lg font-bold">一人ずつ選ぶ</span>
+                </label>
+            </div>
+
+            <div id="pickup-dropdowns-area" class="space-y-4 mb-8">
+                </div>
+
+            <button onclick="submitPickups()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-xl shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
+                確認画面へ
+            </button>
+        </div>
+
+        <div id="screen-b05" class="screen p-4">
+            <button onclick="goTo('screen-b04')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
+            <h2 class="text-2xl font-bold mb-6">予約内容の確認</h2>
+
+            <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
+                <div class="mb-4 pb-4 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm">ツアー名</p>
+                    <p class="text-xl font-bold" id="conf-tour">--</p>
+                </div>
+                <div class="mb-4 pb-4 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm">日付</p>
+                    <p class="text-xl font-bold" id="conf-date">--</p>
+                </div>
+                <div class="mb-4 pb-4 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm">代表者名</p>
+                    <p class="text-xl font-bold" id="conf-name">-- 様</p>
+                </div>
+                <div class="mb-4 pb-4 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm">人数</p>
+                    <p class="text-xl font-bold" id="conf-passengers">--名</p>
+                </div>
+                <div class="mb-4 pb-4 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm">乗車場所</p>
+                    <div id="conf-pickups" class="font-bold text-lg">
+                        </div>
+                </div>
+                
+                <div class="flex justify-between items-center mt-6">
+                    <span class="text-lg font-bold">合計金額</span>
+                    <span class="text-3xl font-bold text-red-600" id="conf-total">¥0</span>
+                </div>
+            </div>
+
+            <button onclick="goTo('screen-b06')" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 mb-4">
+                予約を確定する
+            </button>
+            <p class="text-center text-sm text-gray-500">※ボタンを押すと予約が完了します</p>
+        </div>
+
+        <div id="screen-b06" class="screen p-8 text-center flex flex-col justify-center min-h-[60vh]">
+            <div class="text-6xl mb-6">✅</div>
+            <h2 class="text-2xl font-bold mb-8">予約を受け付けました</h2>
+            
+            <div class="bg-red-50 border-2 border-red-100 p-6 rounded-xl text-left w-full mb-10">
+                <p class="font-bold text-red-600 mb-2 text-lg">⚠️ キャンセルについて</p>
+                <p class="text-lg font-medium">キャンセルは公式LINEからご連絡ください。</p>
+            </div>
+
+            <p class="text-xl font-bold text-gray-800 leading-relaxed">
+                この画面は閉じて大丈夫です<br>
+                (LINEに戻ってください)
+            </p>
+        </div>
+
+    </div>
+
+    <script>
+        // ---------------------------------
+        // アプリケーションの状態保持 (キャッシュ)
+        // ---------------------------------
+        const cache = {
+            date: null,
+            tourTitle: null,
+            pricePerPerson: 0,
+            userInfo: {}, // B-03の入力値
+            passengers: 1,
+            pickups: []   // 選択された乗車地
+        };
+
+        const PICKUP_OPTIONS = [
+            "新宿駅 西口", "東京駅 丸の内北口", "横浜駅 東口"
+        ];
+
+        // ---------------------------------
+        // 画面遷移・初期設定
+        // ---------------------------------
+        function goTo(screenId) {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        // B-01 -> B-02
+        function selectDate(dateStr) {
+            cache.date = dateStr; // 日付を保存
+            document.getElementById('view-date-title').innerText = dateStr.replace('-', '年').replace('-', '月') + "日のツアー";
+            goTo('screen-b02');
+        }
+
+        // B-02 -> B-03
+        function selectTour(title, price) {
+            cache.tourTitle = title;
+            cache.pricePerPerson = price;
+            // フォームは空のまま (前回の入力が残らないようにするならここでresetするが、今回は残す)
+            goTo('screen-b03');
+        }
+
+        // ---------------------------------
+        // B-03 処理 (入力保存)
+        // ---------------------------------
+        function tryAutoFill() {
+            // ローカルストレージから読み込み (シミュレーション)
+            const saved = localStorage.getItem('user_profile_cache');
+            if (saved) {
+                const data = JSON.parse(saved);
+                document.getElementById('input-name').value = data.name || "";
+                document.getElementById('input-phone').value = data.phone || "";
+                document.getElementById('input-zip').value = data.zip || "";
+                document.getElementById('input-pref').value = data.pref || "";
+                document.getElementById('input-city').value = data.city || "";
+                document.getElementById('input-street').value = data.street || "";
+                alert("前回の情報を入力しました");
+            } else {
+                alert("保存された情報がありません");
+            }
+        }
+
+        function submitUserInfo() {
+            // 1. 入力値をメモリ(キャッシュ)に保存
+            cache.userInfo = {
+                name: document.getElementById('input-name').value,
+                phone: document.getElementById('input-phone').value,
+                zip: document.getElementById('input-zip').value,
+                pref: document.getElementById('input-pref').value,
+                city: document.getElementById('input-city').value,
+                street: document.getElementById('input-street').value
+            };
+            cache.passengers = parseInt(document.getElementById('input-passengers').value);
+
+            // 2. 「次回も使う」がONならローカルストレージへ保存
+            const consent = document.getElementById('consent-next').checked;
+            if (consent) {
+                localStorage.setItem('user_profile_cache', JSON.stringify(cache.userInfo));
+            }
+
+            // 3. 次の画面の準備
+            setupPickupScreen();
+            goTo('screen-b04');
+        }
+
+        // ---------------------------------
+        // B-04 処理 (動的生成)
+        // ---------------------------------
+        function setupPickupScreen() {
+            document.getElementById('pickup-count-label').innerText = `参加人数：${cache.passengers}名`;
+            
+            const modeSelector = document.getElementById('pickup-mode-selector');
+            if (cache.passengers >= 2) {
+                modeSelector.classList.remove('hidden');
+                modeSelector.classList.add('flex');
+            } else {
+                modeSelector.classList.add('hidden');
+                modeSelector.classList.remove('flex');
+                // 強制的に「全員同じ」モード扱いに
+                document.querySelector('input[name="pickup_mode"][value="same"]').checked = true;
+            }
+            renderPickupDropdowns();
+        }
+
+        function renderPickupDropdowns() {
+            const area = document.getElementById('pickup-dropdowns-area');
+            area.innerHTML = ''; // クリア
+            
+            const mode = document.querySelector('input[name="pickup_mode"]:checked').value;
+            const count = (mode === 'same' || cache.passengers === 1) ? 1 : cache.passengers;
+
+            for (let i = 0; i < count; i++) {
+                const wrapper = document.createElement('div');
+                
+                // ラベル (一人ずつの場合のみ表示)
+                if (mode === 'individual' && cache.passengers > 1) {
+                    const label = document.createElement('label');
+                    label.className = "block text-sm font-bold mb-1 text-gray-600";
+                    label.innerText = `${i + 1}人目の乗車場所`;
+                    wrapper.appendChild(label);
+                } else if (i === 0) {
+                    const label = document.createElement('label');
+                    label.className = "block text-lg font-bold mb-2";
+                    label.innerText = "乗車場所を選択";
+                    wrapper.appendChild(label);
+                }
+
+                // セレクトボックス
+                const select = document.createElement('select');
+                select.className = "pickup-select w-full border-2 border-gray-300 p-3 rounded-lg bg-white text-lg h-14";
+                
+                PICKUP_OPTIONS.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.innerText = opt;
+                    select.appendChild(option);
+                });
+
+                wrapper.appendChild(select);
+                area.appendChild(wrapper);
+            }
+        }
+
+        function submitPickups() {
+            // 選択された値を収集
+            const selects = document.querySelectorAll('.pickup-select');
+            cache.pickups = Array.from(selects).map(s => s.value);
+            
+            setupConfirmScreen();
+            goTo('screen-b05');
+        }
+
+        // ---------------------------------
+        // B-05 処理 (確認表示)
+        // ---------------------------------
+        function setupConfirmScreen() {
+            // 保存されたキャッシュデータをDOMに反映
+            document.getElementById('conf-tour').innerText = cache.tourTitle;
+            document.getElementById('conf-date').innerText = cache.date;
+            document.getElementById('conf-name').innerText = cache.userInfo.name + " 様";
+            document.getElementById('conf-passengers').innerText = cache.passengers + "名";
+            
+            // 金額計算
+            const total = cache.pricePerPerson * cache.passengers;
+            document.getElementById('conf-total').innerText = "¥" + total.toLocaleString();
+
+            // 乗車地表示
+            const pickupContainer = document.getElementById('conf-pickups');
+            pickupContainer.innerHTML = '';
+            
+            const mode = document.querySelector('input[name="pickup_mode"]:checked').value;
+            if (mode === 'same' || cache.passengers === 1) {
+                pickupContainer.innerText = cache.pickups[0];
+            } else {
+                // 複数箇所リスト表示
+                const ul = document.createElement('ul');
+                ul.className = "list-disc pl-5 text-base font-normal mt-2";
+                cache.pickups.forEach((p, idx) => {
+                    const li = document.createElement('li');
+                    li.innerText = `${idx+1}人目: ${p}`;
+                    ul.appendChild(li);
+                });
+                pickupContainer.appendChild(ul);
+            }
+        }
+
+    </script>
+</body>
+</html>
