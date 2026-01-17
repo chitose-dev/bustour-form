@@ -248,21 +248,6 @@
             </button>
         </div>
 
-        <div id="screen-b06" class="screen p-8 text-center flex flex-col justify-center min-h-[60vh]">
-            <div class="text-6xl mb-6">✅</div>
-            <h2 class="text-2xl font-bold mb-8">予約を受け付けました</h2>
-            
-            <div class="bg-red-50 border-2 border-red-100 p-6 rounded-xl text-left w-full mb-10">
-                <p class="font-bold text-red-600 mb-2 text-lg">⚠️ キャンセルについて</p>
-                <p class="text-lg font-medium">キャンセルは公式LINEからご連絡ください。</p>
-            </div>
-
-            <p class="text-xl font-bold text-gray-800 leading-relaxed">
-                この画面は閉じて大丈夫です<br>
-                (LINEに戻ってください)
-            </p>
-        </div>
-
     </div>
 
     <script>
@@ -337,6 +322,10 @@
         // 初期化
         // ---------------------------------
         document.addEventListener('DOMContentLoaded', async () => {
+            // 画面の初期化：B-01だけを表示
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById('screen-b01').classList.add('active');
+            
             // LIFF初期化（オプション）
             try {
                 const liffId = "YOUR_LIFF_ID";
@@ -801,6 +790,39 @@
         }
 
         // ---------------------------------
+        // B-06 完了画面を動的に生成
+        // ---------------------------------
+        function createCompletionScreen() {
+            // 既存のB-06画面があれば削除
+            const existing = document.getElementById('screen-b06');
+            if (existing) {
+                existing.remove();
+            }
+            
+            // 新しいB-06画面を作成
+            const screen = document.createElement('div');
+            screen.id = 'screen-b06';
+            screen.className = 'screen p-8 text-center flex flex-col justify-center min-h-[60vh]';
+            screen.innerHTML = `
+                <div class="text-6xl mb-6">✅</div>
+                <h2 class="text-2xl font-bold mb-8">予約を受け付けました</h2>
+                
+                <div class="bg-red-50 border-2 border-red-100 p-6 rounded-xl text-left w-full mb-10">
+                    <p class="font-bold text-red-600 mb-2 text-lg">⚠️ キャンセルについて</p>
+                    <p class="text-lg font-medium">キャンセルは公式LINEからご連絡ください。</p>
+                </div>
+
+                <p class="text-xl font-bold text-gray-800 leading-relaxed">
+                    この画面は閉じて大丈夫です<br>
+                    (LINEに戻ってください)
+                </p>
+            `;
+            
+            // DOMに追加
+            document.querySelector('.max-w-md').appendChild(screen);
+        }
+
+        // ---------------------------------
         // B-06 予約送信（静的デモ）
         // ---------------------------------
         async function submitReservation() {
@@ -830,6 +852,8 @@
                 consentAutoFill: document.getElementById('consent-next').checked
             });
 
+            // B-06画面を動的に生成
+            createCompletionScreen();
             goTo('screen-b06');
             
             cache.isSubmitting = false;

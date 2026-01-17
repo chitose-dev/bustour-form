@@ -12,7 +12,7 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#FACC15', /* 黄色 */
+                        primary: '#FACC15',
                         'primary-hover': '#EAB308',
                         text: '#000000',
                         bg: '#FFFFFF',
@@ -25,8 +25,7 @@
         body { font-family: "Helvetica Neue", Arial, sans-serif; }
         .screen { display: none; }
         .screen.active { display: block; }
-        /* 入力要素の文字サイズ調整 */
-        input, select, textarea { font-size: 1.125rem; } 
+        input, select, textarea { font-size: 1.125rem; }
     </style>
 </head>
 <body class="bg-gray-100 text-black antialiased">
@@ -42,9 +41,7 @@
             <div class="grid grid-cols-7 gap-2 text-center mb-2 font-bold text-gray-600">
                 <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
             </div>
-            
             <div id="calendar-grid" class="grid grid-cols-7 gap-2 text-center">
-                <!-- カレンダーがAPIから動的に生成される -->
                 <div class="h-14 flex items-center justify-center text-gray-400">読み込み中...</div>
             </div>
             <p class="mt-6 text-sm text-gray-500 text-center">※グレーの日付は選択できません</p>
@@ -53,9 +50,7 @@
         <div id="screen-b02" class="screen p-4">
             <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 日付を変更</button>
             <h2 class="text-xl font-bold mb-4" id="view-date-title">--月--日のツアー</h2>
-
             <div id="tour-list" class="space-y-6">
-                <!-- ツアー一覧がAPIから動的に生成される -->
                 <div class="text-center text-gray-400 py-8">読み込み中...</div>
             </div>
         </div>
@@ -63,26 +58,20 @@
         <div id="screen-b03" class="screen p-4">
             <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
             <h2 class="text-2xl font-bold mb-6">お客様情報の入力</h2>
-
             <form id="booking-form" onsubmit="event.preventDefault(); submitUserInfo();">
                 <div class="mb-6">
                     <label class="block text-lg font-bold mb-2">お名前 <span class="text-red-500">*</span></label>
                     <input type="text" id="input-name" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-gray-50" required>
                 </div>
-
                 <div class="mb-6">
                     <label class="block text-lg font-bold mb-2">電話番号 <span class="text-red-500">*</span></label>
                     <input type="tel" id="input-phone" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-gray-50" required>
                 </div>
-
                 <div class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
                     <p class="font-bold text-lg mb-4 border-b pb-2">ご住所 <span class="text-red-500">*</span></p>
                     <div class="mb-4">
                         <label class="block text-sm font-bold mb-1 text-gray-600">郵便番号</label>
-                        <div class="flex gap-2">
-                            <input type="text" id="input-zip" class="w-1/2 border-2 border-gray-300 p-3 rounded-lg bg-white">
-                            <button type="button" class="w-1/2 bg-gray-200 text-black font-bold rounded-lg border-2 border-gray-300 text-sm">住所検索</button>
-                        </div>
+                        <input type="text" id="input-zip" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white">
                     </div>
                     <div class="mb-4">
                         <label class="block text-sm font-bold mb-1 text-gray-600">都道府県</label>
@@ -91,7 +80,7 @@
                             <option value="東京都">東京都</option>
                             <option value="神奈川県">神奈川県</option>
                             <option value="埼玉県">埼玉県</option>
-                            </select>
+                        </select>
                     </div>
                     <div class="mb-4">
                         <label class="block text-sm font-bold mb-1 text-gray-600">市区町村</label>
@@ -102,7 +91,6 @@
                         <input type="text" id="input-street" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white">
                     </div>
                 </div>
-
                 <div class="mb-6">
                     <label class="block text-lg font-bold mb-2">参加人数</label>
                     <select id="input-passengers" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white text-lg">
@@ -112,16 +100,11 @@
                         <option value="4">4名</option>
                     </select>
                 </div>
-
-                <div class="mb-6" id="preferred-seats-area">
-                    <!-- 前列座席指定チェックボックスが動的に挿入される -->
-                </div>
-
+                <div class="mb-6" id="preferred-seats-area"></div>
                 <div class="mb-8 flex items-center bg-yellow-50 p-4 rounded-lg border border-yellow-200">
                     <input type="checkbox" id="consent-next" class="w-6 h-6 text-primary border-gray-300 rounded focus:ring-primary">
                     <label for="consent-next" class="ml-3 text-lg font-bold">次回もこの情報を使う</label>
                 </div>
-
                 <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-xl shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
                     次へ進む
                 </button>
@@ -131,9 +114,7 @@
         <div id="screen-b04" class="screen p-4">
             <button onclick="goTo('screen-b03')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
             <h2 class="text-2xl font-bold mb-6">乗車場所の選択</h2>
-            
             <p class="mb-4 font-bold text-lg" id="pickup-count-label">参加人数：--名</p>
-
             <div id="pickup-mode-selector" class="hidden mb-6 flex-col gap-4">
                 <label class="flex items-center p-4 border rounded-lg bg-white cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-yellow-50 transition">
                     <input type="radio" name="pickup_mode" value="same" class="w-6 h-6" checked onchange="renderPickupDropdowns()">
@@ -144,10 +125,7 @@
                     <span class="ml-3 text-lg font-bold">一人ずつ選ぶ</span>
                 </label>
             </div>
-
-            <div id="pickup-dropdowns-area" class="space-y-4 mb-8">
-                </div>
-
+            <div id="pickup-dropdowns-area" class="space-y-4 mb-8"></div>
             <button onclick="submitPickups()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-xl shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
                 確認画面へ
             </button>
@@ -156,7 +134,6 @@
         <div id="screen-b05" class="screen p-4">
             <button onclick="goTo('screen-b04')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
             <h2 class="text-2xl font-bold mb-6">予約内容の確認</h2>
-
             <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
                 <div class="mb-4 pb-4 border-b border-gray-300">
                     <p class="text-gray-600 text-sm">ツアー名</p>
@@ -176,15 +153,12 @@
                 </div>
                 <div class="mb-4 pb-4 border-b border-gray-300">
                     <p class="text-gray-600 text-sm">乗車場所</p>
-                    <div id="conf-pickups" class="font-bold text-lg">
-                        </div>
+                    <div id="conf-pickups" class="font-bold text-lg"></div>
                 </div>
                 <div class="mb-4 pb-4 border-b border-gray-300">
                     <p class="text-gray-600 text-sm">前列座席指定</p>
-                    <div id="conf-seats" class="font-bold text-lg">
-                        </div>
+                    <div id="conf-seats" class="font-bold text-lg"></div>
                 </div>
-
                 <div class="mt-6 space-y-2">
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">基本料金</span>
@@ -200,44 +174,21 @@
                     </div>
                 </div>
             </div>
-
             <button id="btn-confirm-reservation" onclick="submitReservation()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
                 予約を確定する
             </button>
         </div>
 
-        <div id="screen-b06" class="screen p-8 text-center flex flex-col justify-center min-h-[60vh]">
-            <div class="text-6xl mb-6">✅</div>
-            <h2 class="text-2xl font-bold mb-8">予約を受け付けました</h2>
-            
-            <div class="bg-red-50 border-2 border-red-100 p-6 rounded-xl text-left w-full mb-10">
-                <p class="font-bold text-red-600 mb-2 text-lg">⚠️ キャンセルについて</p>
-                <p class="text-lg font-medium">キャンセルは公式LINEからご連絡ください。</p>
-            </div>
-
-            <p class="text-xl font-bold text-gray-800 leading-relaxed">
-                この画面は閉じて大丈夫です<br>
-                (LINEに戻ってください)
-            </p>
-        </div>
-
     </div>
 
     <script>
-        // ---------------------------------
-        // 設定・定数
-        // ---------------------------------
         const BOOKING_API_BASE = "https://your-backend-booking-url/api/booking";
         const PREFERRED_SEAT_PRICE = 500;
 
-        // 乗車地オプション（APIから動的に取得される）
         let PICKUP_OPTIONS = [];
+        let calendarData = {};
+        let toursData = {};
 
-        // カレンダー・ツアーデータ
-        let calendarData = {}; // { "2026-03-15": ["tour_id_1", ...], ... }
-        let toursData = {};    // { "tour_id_1": { title, date, price, capacity, description, imageUrl, status, remainingSeats }, ... }
-
-        // アプリケーションの状態保持
         const cache = {
             lineUserId: null,
             date: null,
@@ -248,23 +199,21 @@
             passengers: 1,
             pickups: [],
             preferredSeats: [],
-            isSubmitting: false // 二重送信対策
+            isSubmitting: false
         };
 
-        // ---------------------------------
-        // LIFF初期化 & データ取得
-        // ---------------------------------
         document.addEventListener('DOMContentLoaded', async () => {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById('screen-b01').classList.add('active');
+            
             try {
-                const liffId = "YOUR_LIFF_ID"; // 環境に合わせて設定
+                const liffId = "YOUR_LIFF_ID";
                 await liff.init({ liffId });
                 
                 if (liff.isLoggedIn()) {
                     const profile = await liff.getProfile();
                     cache.lineUserId = profile.userId;
                     console.log("LIFF initialized:", cache.lineUserId);
-                    
-                    // プロフィールキャッシュ取得
                     await loadUserProfile();
                 } else {
                     liff.login();
@@ -273,22 +222,17 @@
                 console.error("LIFF init error:", err);
             }
             
-            // カレンダー・ツアー・乗車地データ取得
             await Promise.all([
                 loadCalendarData(),
                 loadPickupOptions()
             ]);
         });
 
-        // ---------------------------------
-        // API: カレンダー取得
-        // ---------------------------------
         async function loadCalendarData() {
             try {
                 const response = await fetch(`${BOOKING_API_BASE}/calendar`);
                 if (response.ok) {
                     const data = await response.json();
-                    // {dates: ["2026-03-15", ...]}
                     calendarData = {};
                     (data.dates || []).forEach(d => {
                         calendarData[d] = true;
@@ -300,9 +244,6 @@
             }
         }
 
-        // ---------------------------------
-        // API: ツアー取得
-        // ---------------------------------
         async function loadToursForDate(dateStr) {
             try {
                 const response = await fetch(`${BOOKING_API_BASE}/tours?date=${dateStr}`);
@@ -319,9 +260,6 @@
             }
         }
 
-        // ---------------------------------
-        // API: 乗車地取得
-        // ---------------------------------
         async function loadPickupOptions() {
             try {
                 const response = await fetch(`${BOOKING_API_BASE}/pickups`);
@@ -331,22 +269,17 @@
                 }
             } catch (err) {
                 console.error("Failed to load pickups:", err);
-                PICKUP_OPTIONS = ["新宿駅 西口", "東京駅 丸の内北口", "横浜駅 東口"]; // フォールバック
+                PICKUP_OPTIONS = ["新宿駅 西口", "東京駅 丸の内北口", "横浜駅 東口"];
             }
         }
 
-        // ---------------------------------
-        // API: ユーザープロフィール取得
-        // ---------------------------------
         async function loadUserProfile() {
             if (!cache.lineUserId) return;
-            
             try {
                 const response = await fetch(`${BOOKING_API_BASE}/profile?lineUserId=${cache.lineUserId}`);
                 if (response.ok) {
                     const profile = await response.json();
                     if (profile && Object.keys(profile).length > 0) {
-                        // consentAutoFill=true の場合のみデータが返される
                         localStorage.setItem('user_profile_cache', JSON.stringify(profile));
                     }
                 }
@@ -355,14 +288,10 @@
             }
         }
 
-        // ---------------------------------
-        // カレンダー描画（動的）
-        // ---------------------------------
         function renderCalendar() {
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = '';
             
-            // 今月を基準に表示（または最初の利用可能日付を基準）
             let targetDate;
             const availableDates = Object.keys(calendarData).sort();
             if (availableDates.length > 0) {
@@ -374,21 +303,17 @@
             const year = targetDate.getFullYear();
             const month = targetDate.getMonth();
             
-            // タイトル更新
             document.getElementById('calendar-month-title').innerText = `${year}年 ${month + 1}月`;
             
-            // 月初の曜日と月末の日を取得
             const firstDay = new Date(year, month, 1).getDay();
             const lastDate = new Date(year, month + 1, 0).getDate();
             
-            // 月初までの空白
             for (let i = 0; i < firstDay; i++) {
                 const empty = document.createElement('div');
                 empty.className = 'h-14';
                 grid.appendChild(empty);
             }
             
-            // 各日付を描画
             for (let d = 1; d <= lastDate; d++) {
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const isAvailable = calendarData[dateStr];
@@ -408,9 +333,6 @@
             }
         }
 
-        // ---------------------------------
-        // ツアー一覧描画（動的）
-        // ---------------------------------
         function renderTourList(dateStr) {
             const container = document.getElementById('tour-list');
             container.innerHTML = '';
@@ -455,28 +377,22 @@
             });
         }
 
-        // ---------------------------------
-        // 画面遷移・初期設定
-        // ---------------------------------
         function goTo(screenId) {
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
             window.scrollTo(0, 0);
         }
 
-        // B-01 -> B-02
         async function selectDate(dateStr) {
             cache.date = dateStr;
             const [y, m, d] = dateStr.split('-');
             document.getElementById('view-date-title').innerText = `${parseInt(m)}月${parseInt(d)}日のツアー`;
             
-            // ツアー一覧をAPIから取得
             document.getElementById('tour-list').innerHTML = '<div class="text-center text-gray-400 py-8">読み込み中...</div>';
             goTo('screen-b02');
             await loadToursForDate(dateStr);
         }
 
-        // B-02 -> B-03
         function selectTour(tourId, title, price) {
             cache.tourId = tourId;
             cache.tourTitle = title;
@@ -485,26 +401,18 @@
             setupPreferredSeatsUI();
             goTo('screen-b03');
             
-            // キャッシュがあれば自動でダイアログ表示
             const saved = localStorage.getItem('user_profile_cache');
             if (saved) {
                 showAutoFillDialog();
             }
         }
 
-        // ---------------------------------
-        // B-03 処理 (入力保存)
-        // ---------------------------------
         function showAutoFillDialog() {
-            // ローカルストレージから読み込み
             const saved = localStorage.getItem('user_profile_cache');
-            if (!saved) {
-                return;
-            }
+            if (!saved) return;
             
             const data = JSON.parse(saved);
             
-            // ポップアップモーダルを作成
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4';
             modal.id = 'auto-fill-modal';
@@ -532,13 +440,10 @@
                     }
                 </style>
                 <div class="popup-content bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
-                    <!-- ヘッダー -->
                     <div class="bg-blue-500 text-white p-4 text-center">
                         <div class="text-3xl mb-1">📋</div>
                         <h3 class="text-xl font-bold">前回の情報を使用しますか？</h3>
                     </div>
-                    
-                    <!-- コンテンツ -->
                     <div class="p-5">
                         <div class="bg-gray-50 p-4 rounded-xl space-y-3 mb-5 border border-gray-200">
                             <div class="flex items-start gap-3">
@@ -565,21 +470,14 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- ボタン -->
                         <div class="flex gap-3">
-                            <button onclick="closeAutoFillDialog()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3.5 rounded-xl text-lg transition-colors">
-                                いいえ
-                            </button>
-                            <button onclick="applyAutoFill()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl text-lg transition-colors shadow-md">
-                                はい
-                            </button>
+                            <button onclick="closeAutoFillDialog()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3.5 rounded-xl text-lg transition-colors">いいえ</button>
+                            <button onclick="applyAutoFill()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl text-lg transition-colors shadow-md">はい</button>
                         </div>
                     </div>
                 </div>
             `;
             
-            // 背景クリックで閉じる
             modal.onclick = (e) => {
                 if (e.target === modal) {
                     closeAutoFillDialog();
@@ -587,8 +485,6 @@
             };
             
             document.body.appendChild(modal);
-            
-            // グローバル参照として保存
             window.autoFillData = data;
         }
         
@@ -617,7 +513,6 @@
         }
 
         function submitUserInfo() {
-            // 1. 入力値をメモリ(キャッシュ)に保存
             cache.userInfo = {
                 name: document.getElementById('input-name').value,
                 phone: document.getElementById('input-phone').value,
@@ -628,35 +523,27 @@
             };
             cache.passengers = parseInt(document.getElementById('input-passengers').value);
 
-            // 2. 前列座席指定情報を収集
             const seatCheckboxes = document.querySelectorAll('.preferred-seat-checkbox');
             cache.preferredSeats = Array.from(seatCheckboxes).map(cb => cb.checked);
 
-            // 3. 「次回も使う」がONならローカルストレージへ保存
             const consent = document.getElementById('consent-next').checked;
             if (consent) {
                 localStorage.setItem('user_profile_cache', JSON.stringify(cache.userInfo));
             }
 
-            // 4. 次の画面の準備
             setupPickupScreen();
             goTo('screen-b04');
         }
 
-        // ---------------------------------
-        // B-03 座席指定UI
-        // ---------------------------------
         function setupPreferredSeatsUI() {
             const area = document.getElementById('preferred-seats-area');
-            area.innerHTML = ''; // クリア
+            area.innerHTML = '';
 
-            // タイトル
             const title = document.createElement('div');
             title.className = "text-lg font-bold mb-3";
             title.innerText = "前列座席指定（+500円/人）";
             area.appendChild(title);
 
-            // チェックボックスグループ
             const container = document.createElement('div');
             container.className = "space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200";
 
@@ -681,9 +568,6 @@
             area.appendChild(container);
         }
 
-        // ---------------------------------
-        // B-04 処理 (動的生成)
-        // ---------------------------------
         function setupPickupScreen() {
             document.getElementById('pickup-count-label').innerText = `参加人数：${cache.passengers}名`;
             
@@ -694,7 +578,6 @@
             } else {
                 modeSelector.classList.add('hidden');
                 modeSelector.classList.remove('flex');
-                // 強制的に「全員同じ」モード扱いに
                 document.querySelector('input[name="pickup_mode"][value="same"]').checked = true;
             }
             renderPickupDropdowns();
@@ -702,7 +585,7 @@
 
         function renderPickupDropdowns() {
             const area = document.getElementById('pickup-dropdowns-area');
-            area.innerHTML = ''; // クリア
+            area.innerHTML = '';
             
             const mode = document.querySelector('input[name="pickup_mode"]:checked').value;
             const count = (mode === 'same' || cache.passengers === 1) ? 1 : cache.passengers;
@@ -710,7 +593,6 @@
             for (let i = 0; i < count; i++) {
                 const wrapper = document.createElement('div');
                 
-                // ラベル (一人ずつの場合のみ表示)
                 if (mode === 'individual' && cache.passengers > 1) {
                     const label = document.createElement('label');
                     label.className = "block text-sm font-bold mb-1 text-gray-600";
@@ -723,7 +605,6 @@
                     wrapper.appendChild(label);
                 }
 
-                // セレクトボックス
                 const select = document.createElement('select');
                 select.className = "pickup-select w-full border-2 border-gray-300 p-3 rounded-lg bg-white text-lg h-14";
                 
@@ -740,7 +621,6 @@
         }
 
         function submitPickups() {
-            // 選択された値を収集
             const selects = document.querySelectorAll('.pickup-select');
             cache.pickups = Array.from(selects).map(s => s.value);
             
@@ -748,17 +628,12 @@
             goTo('screen-b05');
         }
 
-        // ---------------------------------
-        // B-05 処理 (確認表示)
-        // ---------------------------------
         function setupConfirmScreen() {
-            // 保存されたキャッシュデータをDOMに反映
             document.getElementById('conf-tour').innerText = cache.tourTitle;
             document.getElementById('conf-date').innerText = cache.date;
             document.getElementById('conf-name').innerText = cache.userInfo.name + " 様";
             document.getElementById('conf-passengers').innerText = cache.passengers + "名";
             
-            // 金額計算
             const baseTour = cache.pricePerPerson * cache.passengers;
             const seatUpchargeCount = cache.preferredSeats.filter(s => s).length;
             const seatUpcharge = seatUpchargeCount * PREFERRED_SEAT_PRICE;
@@ -768,7 +643,6 @@
             document.getElementById('conf-seat-price').innerText = "¥" + seatUpcharge.toLocaleString();
             document.getElementById('conf-total').innerText = "¥" + total.toLocaleString();
 
-            // 乗車地表示
             const pickupContainer = document.getElementById('conf-pickups');
             pickupContainer.innerHTML = '';
             
@@ -786,7 +660,6 @@
                 pickupContainer.appendChild(ul);
             }
 
-            // 座席指定表示
             const seatContainer = document.getElementById('conf-seats');
             seatContainer.innerHTML = '';
             const seatList = [];
@@ -802,9 +675,31 @@
             }
         }
 
-        // ---------------------------------
-        // B-06 予約送信（二重送信対策付き）
-        // ---------------------------------
+        function createCompletionScreen() {
+            const existing = document.getElementById('screen-b06');
+            if (existing) {
+                existing.remove();
+            }
+            
+            const screen = document.createElement('div');
+            screen.id = 'screen-b06';
+            screen.className = 'screen p-8 text-center flex flex-col justify-center min-h-[60vh]';
+            screen.innerHTML = `
+                <div class="text-6xl mb-6">✅</div>
+                <h2 class="text-2xl font-bold mb-8">予約を受け付けました</h2>
+                <div class="bg-red-50 border-2 border-red-100 p-6 rounded-xl text-left w-full mb-10">
+                    <p class="font-bold text-red-600 mb-2 text-lg">⚠️ キャンセルについて</p>
+                    <p class="text-lg font-medium">キャンセルは公式LINEからご連絡ください。</p>
+                </div>
+                <p class="text-xl font-bold text-gray-800 leading-relaxed">
+                    この画面は閉じて大丈夫です<br>
+                    (LINEに戻ってください)
+                </p>
+            `;
+            
+            document.querySelector('.max-w-md').appendChild(screen);
+        }
+
         async function submitReservation() {
             if (cache.isSubmitting) {
                 alert("送信中です。お待ちください...");
@@ -830,7 +725,6 @@
                     consentAutoFill: document.getElementById('consent-next').checked
                 };
 
-                // API呼び出し (本番環境)
                 const response = await fetch(`${BOOKING_API_BASE}/reservations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -840,6 +734,7 @@
                 if (response.ok) {
                     const data = await response.json();
                     console.log("Reservation success:", data);
+                    createCompletionScreen();
                     goTo('screen-b06');
                 } else {
                     const error = await response.json();
