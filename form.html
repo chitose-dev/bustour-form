@@ -38,23 +38,14 @@
         </header>
 
         <div id="screen-b01" class="screen active p-4">
-            <h2 class="text-xl font-bold text-center mb-6">2026年 3月</h2>
+            <h2 class="text-xl font-bold text-center mb-6" id="calendar-month-title">--年--月</h2>
             <div class="grid grid-cols-7 gap-2 text-center mb-2 font-bold text-gray-600">
                 <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
             </div>
             
-            <div class="grid grid-cols-7 gap-2 text-center">
-                <div class="h-14"></div><div class="h-14"></div>
-                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">1</div>
-                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">2</div>
-                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">..</div>
-                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">14</div>
-                
-                <button onclick="selectDate('2026-03-15')" class="col-start-1 h-14 bg-white border-2 border-primary text-black font-bold flex items-center justify-center rounded shadow-sm hover:bg-yellow-50">
-                    15
-                </button>
-                
-                <div class="h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded">16</div>
+            <div id="calendar-grid" class="grid grid-cols-7 gap-2 text-center">
+                <!-- カレンダーがAPIから動的に生成される -->
+                <div class="h-14 flex items-center justify-center text-gray-400">読み込み中...</div>
             </div>
             <p class="mt-6 text-sm text-gray-500 text-center">※グレーの日付は選択できません</p>
         </div>
@@ -63,20 +54,9 @@
             <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 日付を変更</button>
             <h2 class="text-xl font-bold mb-4" id="view-date-title">--月--日のツアー</h2>
 
-            <div class="border rounded-xl overflow-hidden shadow-md mb-6">
-                <div class="bg-gray-300 h-48 w-full flex items-center justify-center text-gray-500 font-bold">
-                    ツアー画像
-                </div>
-                <div class="p-4">
-                    <h3 class="text-xl font-bold mb-2">春の九州・温泉めぐり</h3>
-                    <p class="text-gray-700 mb-4 text-lg">大分・熊本の名湯を巡る旅。</p>
-                    <div class="flex justify-between items-end">
-                        <span class="text-2xl font-bold">¥12,000</span>
-                        <button onclick="selectTour('春の九州・温泉めぐり', 12000)" class="bg-primary hover:bg-primary-hover text-black font-bold py-3 px-8 rounded-lg text-lg shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
-                            選択する
-                        </button>
-                    </div>
-                </div>
+            <div id="tour-list" class="space-y-6">
+                <!-- ツアー一覧がAPIから動的に生成される -->
+                <div class="text-center text-gray-400 py-8">読み込み中...</div>
             </div>
         </div>
 
@@ -225,10 +205,9 @@
                 </div>
             </div>
 
-            <button id="btn-confirm-reservation" onclick="submitReservation()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 mb-4">
+            <button id="btn-confirm-reservation" onclick="submitReservation()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
                 予約を確定する
             </button>
-            <p class="text-center text-sm text-gray-500">※ボタンを押すと予約が完了します</p>
         </div>
 
         <div id="screen-b06" class="screen p-8 text-center flex flex-col justify-center min-h-[60vh]">
@@ -254,9 +233,13 @@
         // ---------------------------------
         const BOOKING_API_BASE = "https://your-backend-booking-url/api/booking";
         const PREFERRED_SEAT_PRICE = 500;
-        const PICKUP_OPTIONS = [
-            "新宿駅 西口", "東京駅 丸の内北口", "横浜駅 東口"
-        ];
+
+        // 乗車地オプション（APIから動的に取得される）
+        let PICKUP_OPTIONS = [];
+
+        // カレンダー・ツアーデータ
+        let calendarData = {}; // { "2026-03-15": ["tour_id_1", ...], ... }
+        let toursData = {};    // { "tour_id_1": { title, date, price, capacity, description, imageUrl, status, remainingSeats }, ... }
 
         // アプリケーションの状態保持
         const cache = {
@@ -273,7 +256,7 @@
         };
 
         // ---------------------------------
-        // LIFF初期化
+        // LIFF初期化 & データ取得
         // ---------------------------------
         document.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -284,13 +267,197 @@
                     const profile = await liff.getProfile();
                     cache.lineUserId = profile.userId;
                     console.log("LIFF initialized:", cache.lineUserId);
+                    
+                    // プロフィールキャッシュ取得
+                    await loadUserProfile();
                 } else {
                     liff.login();
                 }
             } catch (err) {
                 console.error("LIFF init error:", err);
             }
+            
+            // カレンダー・ツアー・乗車地データ取得
+            await Promise.all([
+                loadCalendarData(),
+                loadPickupOptions()
+            ]);
         });
+
+        // ---------------------------------
+        // API: カレンダー取得
+        // ---------------------------------
+        async function loadCalendarData() {
+            try {
+                const response = await fetch(`${BOOKING_API_BASE}/calendar`);
+                if (response.ok) {
+                    const data = await response.json();
+                    // {dates: ["2026-03-15", ...]}
+                    calendarData = {};
+                    (data.dates || []).forEach(d => {
+                        calendarData[d] = true;
+                    });
+                    renderCalendar();
+                }
+            } catch (err) {
+                console.error("Failed to load calendar:", err);
+            }
+        }
+
+        // ---------------------------------
+        // API: ツアー取得
+        // ---------------------------------
+        async function loadToursForDate(dateStr) {
+            try {
+                const response = await fetch(`${BOOKING_API_BASE}/tours?date=${dateStr}`);
+                if (response.ok) {
+                    const tours = await response.json();
+                    toursData = {};
+                    tours.forEach(t => {
+                        toursData[t.id] = t;
+                    });
+                    renderTourList(dateStr);
+                }
+            } catch (err) {
+                console.error("Failed to load tours:", err);
+            }
+        }
+
+        // ---------------------------------
+        // API: 乗車地取得
+        // ---------------------------------
+        async function loadPickupOptions() {
+            try {
+                const response = await fetch(`${BOOKING_API_BASE}/pickups`);
+                if (response.ok) {
+                    const pickups = await response.json();
+                    PICKUP_OPTIONS = pickups.map(p => p.name);
+                }
+            } catch (err) {
+                console.error("Failed to load pickups:", err);
+                PICKUP_OPTIONS = ["新宿駅 西口", "東京駅 丸の内北口", "横浜駅 東口"]; // フォールバック
+            }
+        }
+
+        // ---------------------------------
+        // API: ユーザープロフィール取得
+        // ---------------------------------
+        async function loadUserProfile() {
+            if (!cache.lineUserId) return;
+            
+            try {
+                const response = await fetch(`${BOOKING_API_BASE}/profile?lineUserId=${cache.lineUserId}`);
+                if (response.ok) {
+                    const profile = await response.json();
+                    if (profile && Object.keys(profile).length > 0) {
+                        // consentAutoFill=true の場合のみデータが返される
+                        localStorage.setItem('user_profile_cache', JSON.stringify(profile));
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load profile:", err);
+            }
+        }
+
+        // ---------------------------------
+        // カレンダー描画（動的）
+        // ---------------------------------
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+            
+            // 今月を基準に表示（または最初の利用可能日付を基準）
+            let targetDate;
+            const availableDates = Object.keys(calendarData).sort();
+            if (availableDates.length > 0) {
+                targetDate = new Date(availableDates[0] + 'T00:00:00');
+            } else {
+                targetDate = new Date();
+            }
+            
+            const year = targetDate.getFullYear();
+            const month = targetDate.getMonth();
+            
+            // タイトル更新
+            document.getElementById('calendar-month-title').innerText = `${year}年 ${month + 1}月`;
+            
+            // 月初の曜日と月末の日を取得
+            const firstDay = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+            
+            // 月初までの空白
+            for (let i = 0; i < firstDay; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'h-14';
+                grid.appendChild(empty);
+            }
+            
+            // 各日付を描画
+            for (let d = 1; d <= lastDate; d++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const isAvailable = calendarData[dateStr];
+                
+                if (isAvailable) {
+                    const btn = document.createElement('button');
+                    btn.className = 'h-14 bg-white border-2 border-primary text-black font-bold flex items-center justify-center rounded shadow-sm hover:bg-yellow-50';
+                    btn.innerText = d;
+                    btn.onclick = () => selectDate(dateStr);
+                    grid.appendChild(btn);
+                } else {
+                    const div = document.createElement('div');
+                    div.className = 'h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded';
+                    div.innerText = d;
+                    grid.appendChild(div);
+                }
+            }
+        }
+
+        // ---------------------------------
+        // ツアー一覧描画（動的）
+        // ---------------------------------
+        function renderTourList(dateStr) {
+            const container = document.getElementById('tour-list');
+            container.innerHTML = '';
+            
+            const tours = Object.values(toursData);
+            
+            if (tours.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-8">この日のツアーはありません</div>';
+                return;
+            }
+            
+            tours.forEach(tour => {
+                const card = document.createElement('div');
+                card.className = 'border rounded-xl overflow-hidden shadow-md';
+                
+                const isFull = tour.remainingSeats <= 0 || tour.status === 'full';
+                const statusBadge = isFull 
+                    ? '<span class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">満席</span>' 
+                    : '';
+                
+                card.innerHTML = `
+                    <div class="relative">
+                        ${tour.imageUrl 
+                            ? `<img src="${tour.imageUrl}" alt="${tour.title}" class="w-full h-48 object-cover">` 
+                            : '<div class="bg-gray-300 h-48 w-full flex items-center justify-center text-gray-500 font-bold">ツアー画像</div>'}
+                        ${statusBadge}
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold mb-2">${tour.title}</h3>
+                        <p class="text-gray-700 mb-2 text-lg">${tour.description || ''}</p>
+                        <p class="text-sm text-gray-500 mb-4">残り ${tour.remainingSeats}席</p>
+                        <div class="flex justify-between items-end">
+                            <span class="text-2xl font-bold">¥${tour.price.toLocaleString()}</span>
+                            ${isFull 
+                                ? '<span class="bg-gray-300 text-gray-500 font-bold py-3 px-8 rounded-lg text-lg">満席</span>'
+                                : `<button onclick="selectTour('${tour.id}', '${tour.title}', ${tour.price})" class="bg-primary hover:bg-primary-hover text-black font-bold py-3 px-8 rounded-lg text-lg shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">選択する</button>`
+                            }
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
 
         // ---------------------------------
         // 画面遷移・初期設定
@@ -302,18 +469,22 @@
         }
 
         // B-01 -> B-02
-        function selectDate(dateStr) {
-            cache.date = dateStr; // 日付を保存
-            document.getElementById('view-date-title').innerText = dateStr.replace('-', '年').replace('-', '月') + "日のツアー";
+        async function selectDate(dateStr) {
+            cache.date = dateStr;
+            const [y, m, d] = dateStr.split('-');
+            document.getElementById('view-date-title').innerText = `${parseInt(m)}月${parseInt(d)}日のツアー`;
+            
+            // ツアー一覧をAPIから取得
+            document.getElementById('tour-list').innerHTML = '<div class="text-center text-gray-400 py-8">読み込み中...</div>';
             goTo('screen-b02');
+            await loadToursForDate(dateStr);
         }
 
         // B-02 -> B-03
-        function selectTour(title, price) {
+        function selectTour(tourId, title, price) {
+            cache.tourId = tourId;
             cache.tourTitle = title;
             cache.pricePerPerson = price;
-            // フォームは空のまま (前回の入力が残らないようにするならここでresetするが、今回は残す)
-            // 参加人数の変更に備えてB-03の初期化
             cache.passengers = parseInt(document.getElementById('input-passengers').value) || 1;
             setupPreferredSeatsUI();
             goTo('screen-b03');
@@ -330,15 +501,63 @@
                 return;
             }
             
-            if (confirm("前回の情報を入力しますか？")) {
-                const data = JSON.parse(saved);
-                document.getElementById('input-name').value = data.name || "";
-                document.getElementById('input-phone').value = data.phone || "";
-                document.getElementById('input-zip').value = data.zip || "";
-                document.getElementById('input-pref').value = data.pref || "";
-                document.getElementById('input-city').value = data.city || "";
-                document.getElementById('input-street').value = data.street || "";
-            }
+            const data = JSON.parse(saved);
+            
+            // モーダルダイアログを作成
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+            modal.id = 'auto-fill-modal';
+            
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-2xl">
+                    <h3 class="text-xl font-bold mb-4 text-center">前回の情報</h3>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6 space-y-3 max-h-64 overflow-y-auto">
+                        <div>
+                            <p class="text-xs text-gray-600">お名前</p>
+                            <p class="font-bold text-lg">${data.name || "---"}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-600">電話番号</p>
+                            <p class="font-bold text-lg">${data.phone || "---"}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-600">ご住所</p>
+                            <p class="font-bold text-base">${data.pref || ""}${data.city || ""}${data.street || ""}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="closeAutoFillDialog()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-black font-bold py-3 rounded-lg">
+                            キャンセル
+                        </button>
+                        <button onclick="applyAutoFill()" class="flex-1 bg-primary hover:bg-primary-hover text-black font-bold py-3 rounded-lg">
+                            この情報を入力
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // グローバル参照として保存
+            window.autoFillData = data;
+        }
+        
+        function closeAutoFillDialog() {
+            const modal = document.getElementById('auto-fill-modal');
+            if (modal) modal.remove();
+        }
+        
+        function applyAutoFill() {
+            const data = window.autoFillData;
+            document.getElementById('input-name').value = data.name || "";
+            document.getElementById('input-phone').value = data.phone || "";
+            document.getElementById('input-zip').value = data.zip || "";
+            document.getElementById('input-pref').value = data.pref || "";
+            document.getElementById('input-city').value = data.city || "";
+            document.getElementById('input-street').value = data.street || "";
+            closeAutoFillDialog();
         }
 
         function submitUserInfo() {
