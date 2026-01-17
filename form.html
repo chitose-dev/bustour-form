@@ -512,7 +512,7 @@
         }
 
         // ---------------------------------
-        // B-03 自動入力ダイアログ
+        // B-03 自動入力ダイアログ（ポップアップ形式）
         // ---------------------------------
         function showAutoFillDialog() {
             const saved = localStorage.getItem('user_profile_cache');
@@ -524,40 +524,87 @@
             
             const data = JSON.parse(saved);
             
-            // モーダルダイアログを作成
+            // ポップアップモーダルを作成
             const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+            modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4';
             modal.id = 'auto-fill-modal';
+            modal.style.animation = 'fadeIn 0.2s ease-out';
             
             modal.innerHTML = `
-                <div class="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-2xl">
-                    <h3 class="text-xl font-bold mb-4 text-center">前回の情報</h3>
-                    
-                    <div class="bg-gray-50 p-4 rounded-lg mb-6 space-y-3 max-h-64 overflow-y-auto">
-                        <div>
-                            <p class="text-xs text-gray-600">お名前</p>
-                            <p class="font-bold text-lg">${data.name || "---"}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-600">電話番号</p>
-                            <p class="font-bold text-lg">${data.phone || "---"}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-600">ご住所</p>
-                            <p class="font-bold text-base">${data.pref || ""}${data.city || ""}${data.street || ""}</p>
-                        </div>
+                <style>
+                    @keyframes fadeIn {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+                    @keyframes slideUp {
+                        from { opacity: 0; transform: translateY(20px) scale(0.95); }
+                        to { opacity: 1; transform: translateY(0) scale(1); }
+                    }
+                    @keyframes slideOut {
+                        from { opacity: 1; transform: translateY(0) scale(1); }
+                        to { opacity: 0; transform: translateY(20px) scale(0.95); }
+                    }
+                    .popup-content {
+                        animation: slideUp 0.3s ease-out;
+                    }
+                    .popup-closing {
+                        animation: slideOut 0.2s ease-in forwards;
+                    }
+                </style>
+                <div class="popup-content bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                    <!-- ヘッダー -->
+                    <div class="bg-blue-500 text-white p-4 text-center">
+                        <div class="text-3xl mb-1">📋</div>
+                        <h3 class="text-xl font-bold">前回の情報を使用しますか？</h3>
                     </div>
                     
-                    <div class="flex gap-3">
-                        <button onclick="closeAutoFillDialog()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-black font-bold py-3 rounded-lg">
-                            キャンセル
-                        </button>
-                        <button onclick="applyAutoFill()" class="flex-1 bg-primary hover:bg-primary-hover text-black font-bold py-3 rounded-lg">
-                            この情報を入力
-                        </button>
+                    <!-- コンテンツ -->
+                    <div class="p-5">
+                        <div class="bg-gray-50 p-4 rounded-xl space-y-3 mb-5 border border-gray-200">
+                            <div class="flex items-start gap-3">
+                                <span class="text-gray-400 text-lg">👤</span>
+                                <div class="flex-1">
+                                    <p class="text-xs text-gray-500 mb-0.5">お名前</p>
+                                    <p class="font-bold text-base">${data.name || "---"}</p>
+                                </div>
+                            </div>
+                            <div class="border-t border-gray-200"></div>
+                            <div class="flex items-start gap-3">
+                                <span class="text-gray-400 text-lg">📞</span>
+                                <div class="flex-1">
+                                    <p class="text-xs text-gray-500 mb-0.5">電話番号</p>
+                                    <p class="font-bold text-base">${data.phone || "---"}</p>
+                                </div>
+                            </div>
+                            <div class="border-t border-gray-200"></div>
+                            <div class="flex items-start gap-3">
+                                <span class="text-gray-400 text-lg">🏠</span>
+                                <div class="flex-1">
+                                    <p class="text-xs text-gray-500 mb-0.5">ご住所</p>
+                                    <p class="font-bold text-sm leading-relaxed">${data.pref || ""}${data.city || ""}${data.street || ""}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- ボタン -->
+                        <div class="flex gap-3">
+                            <button onclick="closeAutoFillDialog()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3.5 rounded-xl text-lg transition-colors">
+                                いいえ
+                            </button>
+                            <button onclick="applyAutoFill()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl text-lg transition-colors shadow-md">
+                                はい
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
+            
+            // 背景クリックで閉じる
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    closeAutoFillDialog();
+                }
+            };
             
             document.body.appendChild(modal);
             
@@ -567,7 +614,15 @@
         
         function closeAutoFillDialog() {
             const modal = document.getElementById('auto-fill-modal');
-            if (modal) modal.remove();
+            if (modal) {
+                const content = modal.querySelector('.popup-content');
+                if (content) {
+                    content.classList.add('popup-closing');
+                    setTimeout(() => modal.remove(), 200);
+                } else {
+                    modal.remove();
+                }
+            }
         }
         
         function applyAutoFill() {
