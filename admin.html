@@ -82,7 +82,7 @@
                 </h2>
 
                 <div class="bg-white p-6 rounded-lg shadow-sm mb-6 border border-gray-200">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div class="grid grid-cols-3 gap-4 items-end">
                         <div>
                             <label class="block text-sm font-bold text-gray-600 mb-1">ツアー名</label>
                             <input type="text" id="filter-tour-name" class="w-full border p-2 rounded" placeholder="部分一致検索">
@@ -99,7 +99,7 @@
                                 <option value="cancelled">キャンセル (cancelled)</option>
                             </select>
                         </div>
-                        <button onclick="loadReservations()" class="bg-gray-800 text-white font-bold py-2 px-4 rounded hover:bg-gray-700">
+                        <button onclick="loadReservations()" class="bg-gray-800 text-white font-bold py-2 px-4 rounded hover:bg-gray-700 col-span-3">
                             <i class="fa-solid fa-filter"></i> 絞り込み
                         </button>
                     </div>
@@ -130,6 +130,7 @@
                                 <th class="p-4 font-bold text-gray-600">ツアー名</th>
                                 <th class="p-4 font-bold text-gray-600">氏名</th>
                                 <th class="p-4 font-bold text-gray-600">人数</th>
+                                <th class="p-4 font-bold text-gray-600">前列座席</th>
                                 <th class="p-4 font-bold text-gray-600">金額</th>
                                 <th class="p-4 font-bold text-gray-600">状態</th>
                                 <th class="p-4 font-bold text-gray-600">操作</th>

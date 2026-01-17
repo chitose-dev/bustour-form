@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>予約管理システム - プロトタイプ</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- LIFF SDK -->
+    <script src="https://liff.line.me/sdk/web/liff.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -82,7 +84,7 @@
             <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
             <h2 class="text-2xl font-bold mb-6">お客様情報の入力</h2>
 
-            <button onclick="tryAutoFill()" class="w-full bg-blue-100 text-blue-800 border-2 border-blue-200 font-bold py-3 rounded-lg mb-8 text-lg flex items-center justify-center gap-2">
+            <button type="button" onclick="showAutoFillDialog()" class="w-full bg-blue-100 text-blue-800 border-2 border-blue-200 font-bold py-3 rounded-lg mb-8 text-lg flex items-center justify-center gap-2">
                 <span>🔄</span> 前回の情報を自動入力
             </button>
 
@@ -133,6 +135,10 @@
                         <option value="3">3名</option>
                         <option value="4">4名</option>
                     </select>
+                </div>
+
+                <div class="mb-6" id="preferred-seats-area">
+                    <!-- 前列座席指定チェックボックスが動的に挿入される -->
                 </div>
 
                 <div class="mb-8 flex items-center bg-yellow-50 p-4 rounded-lg border border-yellow-200">
@@ -197,14 +203,29 @@
                     <div id="conf-pickups" class="font-bold text-lg">
                         </div>
                 </div>
-                
-                <div class="flex justify-between items-center mt-6">
-                    <span class="text-lg font-bold">合計金額</span>
-                    <span class="text-3xl font-bold text-red-600" id="conf-total">¥0</span>
+                <div class="mb-4 pb-4 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm">前列座席指定</p>
+                    <div id="conf-seats" class="font-bold text-lg">
+                        </div>
+                </div>
+
+                <div class="mt-6 space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">基本料金</span>
+                        <span class="font-bold" id="conf-base-price">¥0</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">座席指定料</span>
+                        <span class="font-bold" id="conf-seat-price">¥0</span>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-300">
+                        <span class="text-lg font-bold">合計金額</span>
+                        <span class="text-3xl font-bold text-red-600" id="conf-total">¥0</span>
+                    </div>
                 </div>
             </div>
 
-            <button onclick="goTo('screen-b06')" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 mb-4">
+            <button id="btn-confirm-reservation" onclick="submitReservation()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 mb-4">
                 予約を確定する
             </button>
             <p class="text-center text-sm text-gray-500">※ボタンを押すと予約が完了します</p>
@@ -229,20 +250,47 @@
 
     <script>
         // ---------------------------------
-        // アプリケーションの状態保持 (キャッシュ)
+        // 設定・定数
         // ---------------------------------
-        const cache = {
-            date: null,
-            tourTitle: null,
-            pricePerPerson: 0,
-            userInfo: {}, // B-03の入力値
-            passengers: 1,
-            pickups: []   // 選択された乗車地
-        };
-
+        const BOOKING_API_BASE = "https://your-backend-booking-url/api/booking";
+        const PREFERRED_SEAT_PRICE = 500;
         const PICKUP_OPTIONS = [
             "新宿駅 西口", "東京駅 丸の内北口", "横浜駅 東口"
         ];
+
+        // アプリケーションの状態保持
+        const cache = {
+            lineUserId: null,
+            date: null,
+            tourId: null,
+            tourTitle: null,
+            pricePerPerson: 0,
+            userInfo: {},
+            passengers: 1,
+            pickups: [],
+            preferredSeats: [],
+            isSubmitting: false // 二重送信対策
+        };
+
+        // ---------------------------------
+        // LIFF初期化
+        // ---------------------------------
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const liffId = "YOUR_LIFF_ID"; // 環境に合わせて設定
+                await liff.init({ liffId });
+                
+                if (liff.isLoggedIn()) {
+                    const profile = await liff.getProfile();
+                    cache.lineUserId = profile.userId;
+                    console.log("LIFF initialized:", cache.lineUserId);
+                } else {
+                    liff.login();
+                }
+            } catch (err) {
+                console.error("LIFF init error:", err);
+            }
+        });
 
         // ---------------------------------
         // 画面遷移・初期設定
@@ -265,16 +313,24 @@
             cache.tourTitle = title;
             cache.pricePerPerson = price;
             // フォームは空のまま (前回の入力が残らないようにするならここでresetするが、今回は残す)
+            // 参加人数の変更に備えてB-03の初期化
+            cache.passengers = parseInt(document.getElementById('input-passengers').value) || 1;
+            setupPreferredSeatsUI();
             goTo('screen-b03');
         }
 
         // ---------------------------------
         // B-03 処理 (入力保存)
         // ---------------------------------
-        function tryAutoFill() {
-            // ローカルストレージから読み込み (シミュレーション)
+        function showAutoFillDialog() {
+            // ローカルストレージから読み込み
             const saved = localStorage.getItem('user_profile_cache');
-            if (saved) {
+            if (!saved) {
+                alert("保存された情報がありません");
+                return;
+            }
+            
+            if (confirm("前回の情報を入力しますか？")) {
                 const data = JSON.parse(saved);
                 document.getElementById('input-name').value = data.name || "";
                 document.getElementById('input-phone').value = data.phone || "";
@@ -282,9 +338,6 @@
                 document.getElementById('input-pref').value = data.pref || "";
                 document.getElementById('input-city').value = data.city || "";
                 document.getElementById('input-street').value = data.street || "";
-                alert("前回の情報を入力しました");
-            } else {
-                alert("保存された情報がありません");
             }
         }
 
@@ -300,15 +353,57 @@
             };
             cache.passengers = parseInt(document.getElementById('input-passengers').value);
 
-            // 2. 「次回も使う」がONならローカルストレージへ保存
+            // 2. 前列座席指定情報を収集
+            const seatCheckboxes = document.querySelectorAll('.preferred-seat-checkbox');
+            cache.preferredSeats = Array.from(seatCheckboxes).map(cb => cb.checked);
+
+            // 3. 「次回も使う」がONならローカルストレージへ保存
             const consent = document.getElementById('consent-next').checked;
             if (consent) {
                 localStorage.setItem('user_profile_cache', JSON.stringify(cache.userInfo));
             }
 
-            // 3. 次の画面の準備
+            // 4. 次の画面の準備
             setupPickupScreen();
             goTo('screen-b04');
+        }
+
+        // ---------------------------------
+        // B-03 座席指定UI
+        // ---------------------------------
+        function setupPreferredSeatsUI() {
+            const area = document.getElementById('preferred-seats-area');
+            area.innerHTML = ''; // クリア
+
+            // タイトル
+            const title = document.createElement('div');
+            title.className = "text-lg font-bold mb-3";
+            title.innerText = "前列座席指定（+500円/人）";
+            area.appendChild(title);
+
+            // チェックボックスグループ
+            const container = document.createElement('div');
+            container.className = "space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200";
+
+            for (let i = 0; i < cache.passengers; i++) {
+                const label = document.createElement('label');
+                label.className = "flex items-center p-3 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition";
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'preferred-seat-checkbox w-5 h-5 text-primary border-gray-300 rounded';
+                checkbox.value = i;
+                
+                const labelText = document.createElement('span');
+                labelText.className = 'ml-3 text-base font-medium';
+                labelText.innerText = `${i + 1}人目：前列座席を希望する`;
+                
+                label.appendChild(checkbox);
+                label.appendChild(labelText);
+                container.appendChild(label);
+            }
+
+            area.appendChild(container);
         }
 
         // ---------------------------------
@@ -389,7 +484,13 @@
             document.getElementById('conf-passengers').innerText = cache.passengers + "名";
             
             // 金額計算
-            const total = cache.pricePerPerson * cache.passengers;
+            const baseTour = cache.pricePerPerson * cache.passengers;
+            const seatUpchargeCount = cache.preferredSeats.filter(s => s).length;
+            const seatUpcharge = seatUpchargeCount * PREFERRED_SEAT_PRICE;
+            const total = baseTour + seatUpcharge;
+            
+            document.getElementById('conf-base-price').innerText = "¥" + baseTour.toLocaleString();
+            document.getElementById('conf-seat-price').innerText = "¥" + seatUpcharge.toLocaleString();
             document.getElementById('conf-total').innerText = "¥" + total.toLocaleString();
 
             // 乗車地表示
@@ -400,7 +501,6 @@
             if (mode === 'same' || cache.passengers === 1) {
                 pickupContainer.innerText = cache.pickups[0];
             } else {
-                // 複数箇所リスト表示
                 const ul = document.createElement('ul');
                 ul.className = "list-disc pl-5 text-base font-normal mt-2";
                 cache.pickups.forEach((p, idx) => {
@@ -410,8 +510,75 @@
                 });
                 pickupContainer.appendChild(ul);
             }
+
+            // 座席指定表示
+            const seatContainer = document.getElementById('conf-seats');
+            seatContainer.innerHTML = '';
+            const seatList = [];
+            cache.preferredSeats.forEach((isSeat, idx) => {
+                if (isSeat) {
+                    seatList.push(`${idx+1}人目`);
+                }
+            });
+            if (seatList.length > 0) {
+                seatContainer.innerText = seatList.join("、") + "が前列座席指定";
+            } else {
+                seatContainer.innerText = "座席指定なし";
+            }
         }
 
+        // ---------------------------------
+        // B-06 予約送信（二重送信対策付き）
+        // ---------------------------------
+        async function submitReservation() {
+            if (cache.isSubmitting) {
+                alert("送信中です。お待ちください...");
+                return;
+            }
+
+            cache.isSubmitting = true;
+            const btn = document.getElementById('btn-confirm-reservation');
+            btn.disabled = true;
+            btn.innerText = "読み込み中…";
+
+            try {
+                const payload = {
+                    lineUserId: cache.lineUserId,
+                    date: cache.date,
+                    tourId: cache.tourId,
+                    tourTitle: cache.tourTitle,
+                    pricePerPerson: cache.pricePerPerson,
+                    userInfo: cache.userInfo,
+                    passengers: cache.passengers,
+                    pickups: cache.pickups,
+                    preferredSeats: cache.preferredSeats,
+                    consentAutoFill: document.getElementById('consent-next').checked
+                };
+
+                // API呼び出し (本番環境)
+                const response = await fetch(`${BOOKING_API_BASE}/reservations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("Reservation success:", data);
+                    goTo('screen-b06');
+                } else {
+                    const error = await response.json();
+                    alert("予約エラー: " + (error.message || "予約できませんでした"));
+                }
+            } catch (err) {
+                console.error("API error:", err);
+                alert("通信エラーが発生しました");
+            } finally {
+                cache.isSubmitting = false;
+                btn.disabled = false;
+                btn.innerText = "予約を確定する";
+            }
+        }
     </script>
 </body>
 </html>
