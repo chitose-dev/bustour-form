@@ -337,6 +337,10 @@
         // 初期化
         // ---------------------------------
         document.addEventListener('DOMContentLoaded', async () => {
+            // 画面の初期化：B-01だけを表示
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById('screen-b01').classList.add('active');
+            
             // LIFF初期化（オプション）
             try {
                 const liffId = "YOUR_LIFF_ID";
