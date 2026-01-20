@@ -37,7 +37,11 @@
         </header>
 
         <div id="screen-b01" class="screen active p-4">
-            <h2 class="text-xl font-bold text-center mb-6" id="calendar-month-title">--年--月</h2>
+            <div class="flex items-center justify-between mb-6">
+                <button onclick="changeMonth(-1)" class="text-blue-600 font-bold text-2xl px-4 py-2 hover:bg-gray-100 rounded">&lt;</button>
+                <h2 class="text-xl font-bold" id="calendar-month-title">--年--月</h2>
+                <button onclick="changeMonth(1)" class="text-blue-600 font-bold text-2xl px-4 py-2 hover:bg-gray-100 rounded">&gt;</button>
+            </div>
             <div class="grid grid-cols-7 gap-2 text-center mb-2 font-bold text-gray-600">
                 <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
             </div>
@@ -202,6 +206,10 @@
             isSubmitting: false
         };
 
+        // カレンダー表示用の年月管理
+        let currentCalendarYear = new Date().getFullYear();
+        let currentCalendarMonth = new Date().getMonth();
+
         document.addEventListener('DOMContentLoaded', async () => {
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
             document.getElementById('screen-b01').classList.add('active');
@@ -292,16 +300,8 @@
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = '';
             
-            let targetDate;
-            const availableDates = Object.keys(calendarData).sort();
-            if (availableDates.length > 0) {
-                targetDate = new Date(availableDates[0] + 'T00:00:00');
-            } else {
-                targetDate = new Date();
-            }
-            
-            const year = targetDate.getFullYear();
-            const month = targetDate.getMonth();
+            const year = currentCalendarYear;
+            const month = currentCalendarMonth;
             
             document.getElementById('calendar-month-title').innerText = `${year}年 ${month + 1}月`;
             
@@ -331,6 +331,18 @@
                     grid.appendChild(div);
                 }
             }
+        }
+
+        function changeMonth(delta) {
+            currentCalendarMonth += delta;
+            if (currentCalendarMonth > 11) {
+                currentCalendarMonth = 0;
+                currentCalendarYear++;
+            } else if (currentCalendarMonth < 0) {
+                currentCalendarMonth = 11;
+                currentCalendarYear--;
+            }
+            renderCalendar();
         }
 
         function renderTourList(dateStr) {
@@ -523,8 +535,9 @@
             };
             cache.passengers = parseInt(document.getElementById('input-passengers').value);
 
-            const seatCheckboxes = document.querySelectorAll('.preferred-seat-checkbox');
-            cache.preferredSeats = Array.from(seatCheckboxes).map(cb => cb.checked);
+            const seatCheckbox = document.getElementById('preferred-seat-all');
+            const allSeats = seatCheckbox && seatCheckbox.checked;
+            cache.preferredSeats = Array(cache.passengers).fill(allSeats);
 
             const consent = document.getElementById('consent-next').checked;
             if (consent) {
@@ -539,31 +552,24 @@
             const area = document.getElementById('preferred-seats-area');
             area.innerHTML = '';
 
-            const title = document.createElement('div');
-            title.className = "text-lg font-bold mb-3";
-            title.innerText = "前列座席指定（+500円/人）";
-            area.appendChild(title);
-
             const container = document.createElement('div');
-            container.className = "space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200";
+            container.className = "p-4 bg-gray-50 rounded-lg border border-gray-200";
 
-            for (let i = 0; i < cache.passengers; i++) {
-                const label = document.createElement('label');
-                label.className = "flex items-center p-3 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition";
-                
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'preferred-seat-checkbox w-5 h-5 text-primary border-gray-300 rounded';
-                checkbox.value = i;
-                
-                const labelText = document.createElement('span');
-                labelText.className = 'ml-3 text-base font-medium';
-                labelText.innerText = `${i + 1}人目：前列座席を希望する`;
-                
-                label.appendChild(checkbox);
-                label.appendChild(labelText);
-                container.appendChild(label);
-            }
+            const label = document.createElement('label');
+            label.className = "flex items-center p-3 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition";
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = 'preferred-seat-all';
+            checkbox.className = 'w-5 h-5 text-primary border-gray-300 rounded';
+            
+            const labelText = document.createElement('span');
+            labelText.className = 'ml-3 text-lg font-bold';
+            labelText.innerText = `前列座席を希望する（全員分 +¥${(PREFERRED_SEAT_PRICE * cache.passengers).toLocaleString()}）`;
+            
+            label.appendChild(checkbox);
+            label.appendChild(labelText);
+            container.appendChild(label);
 
             area.appendChild(container);
         }
@@ -687,13 +693,19 @@
             screen.innerHTML = `
                 <div class="text-6xl mb-6">✅</div>
                 <h2 class="text-2xl font-bold mb-8">予約を受け付けました</h2>
-                <div class="bg-red-50 border-2 border-red-100 p-6 rounded-xl text-left w-full mb-10">
-                    <p class="font-bold text-red-600 mb-2 text-lg">⚠️ キャンセルについて</p>
-                    <p class="text-lg font-medium">キャンセルは公式LINEからご連絡ください。</p>
+                <div class="bg-blue-50 border-2 border-blue-100 p-6 rounded-xl text-left w-full mb-6 space-y-4">
+                    <p class="text-base leading-relaxed">
+                        弊社が確認後、LINEにて、予約確定通知をお送りいたします。担当者からの連絡をお待ちください。
+                    </p>
+                    <p class="text-base leading-relaxed">
+                        2営業日（土日祝休）を経過してもご連絡がない場合は、お申込みが届いていない可能性がございます。その際はお手数ですがご一報ください。
+                    </p>
+                    <p class="text-base leading-relaxed">
+                        乗車地「六之本・米原・彦根」は他のお客様を含めて5名以上のお申込みがない場合、変更をお願いする場合がございます。
+                    </p>
                 </div>
-                <p class="text-xl font-bold text-gray-800 leading-relaxed">
-                    この画面は閉じて大丈夫です<br>
-                    (LINEに戻ってください)
+                <p class="text-xl font-bold text-gray-800">
+                    この画面は閉じても大丈夫です。
                 </p>
             `;
             
