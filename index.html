@@ -37,8 +37,8 @@
             バスツアー予約
         </header>
 
-        <div id="screen-b01" class="screen active p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-4xl lg:mx-auto">
+        <div id="screen-b01" class="screen active p-4">
+            <div>
                 <div class="flex items-center justify-between mb-6 lg:mb-10">
                     <button onclick="changeMonth(-1)" class="text-blue-600 font-bold text-2xl lg:text-4xl px-4 py-2 lg:px-6 lg:py-3 hover:bg-gray-100 rounded-lg">&lt;</button>
                     <h2 class="text-xl lg:text-3xl font-bold" id="calendar-month-title">--年--月</h2>
@@ -54,8 +54,8 @@
             </div>
         </div>
 
-        <div id="screen-b02" class="screen p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-4xl lg:mx-auto">
+        <div id="screen-b02" class="screen p-4">
+            <div>
                 <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 日付を変更</button>
                 <h2 class="text-xl lg:text-3xl font-bold mb-4 lg:mb-8" id="view-date-title">--月--日のツアー</h2>
                 <div id="tour-list" class="space-y-6 lg:space-y-8">
@@ -64,8 +64,8 @@
             </div>
         </div>
 
-        <div id="screen-b03" class="screen p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-2xl lg:mx-auto">
+        <div id="screen-b03" class="screen p-4">
+            <div>
                 <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
                 <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">お客様情報の入力</h2>
                 <form id="booking-form" onsubmit="event.preventDefault(); submitUserInfo();">
@@ -122,8 +122,8 @@
             </div>
         </div>
 
-        <div id="screen-b04" class="screen p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-2xl lg:mx-auto">
+        <div id="screen-b04" class="screen p-4">
+            <div>
                 <button onclick="goTo('screen-b03')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
                 <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">乗車場所の選択</h2>
                 <p class="mb-4 lg:mb-6 font-bold text-lg lg:text-2xl" id="pickup-count-label">参加人数：--名</p>
@@ -144,8 +144,8 @@
             </div>
         </div>
 
-        <div id="screen-b05" class="screen p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-2xl lg:mx-auto">
+        <div id="screen-b05" class="screen p-4">
+            <div>
                 <button onclick="goTo('screen-b04')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
                 <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">予約内容の確認</h2>
             <div class="bg-gray-50 p-6 lg:p-8 rounded-xl border border-gray-200 mb-8 lg:mb-12">
