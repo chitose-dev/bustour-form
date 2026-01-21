@@ -30,9 +30,10 @@
 </head>
 <body class="bg-gray-100 text-black antialiased">
 
-    <div class="max-w-md md:max-w-2xl lg:max-w-4xl mx-auto bg-white min-h-screen shadow-lg relative pb-10">
+    <!-- PC表示時は中央に適切な幅で表示、スマホは全幅 -->
+    <div class="max-w-md mx-auto lg:max-w-lg xl:max-w-xl bg-white min-h-screen shadow-lg lg:shadow-2xl relative pb-10 lg:my-8 lg:rounded-2xl lg:min-h-0">
         
-        <header class="bg-primary p-4 text-center font-bold text-xl shadow-sm sticky top-0 z-10">
+        <header class="bg-primary p-4 lg:p-5 text-center font-bold text-xl lg:text-2xl shadow-sm sticky top-0 z-10 lg:rounded-t-2xl">
             バスツアー予約
         </header>
 
@@ -178,7 +179,7 @@
                     </div>
                 </div>
             </div>
-            <button id="btn-confirm-reservation" onclick="submitReservation()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
+            <button id="btn-confirm-reservation" onclick="submitReservation()" class="w-full lg:w-auto lg:px-16 lg:mx-auto lg:block bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 transition-colors">
                 予約を確定する
             </button>
         </div>
@@ -310,7 +311,7 @@
             
             for (let i = 0; i < firstDay; i++) {
                 const empty = document.createElement('div');
-                empty.className = 'h-14';
+                empty.className = 'h-14 lg:h-16';
                 grid.appendChild(empty);
             }
             
@@ -320,13 +321,13 @@
                 
                 if (isAvailable) {
                     const btn = document.createElement('button');
-                    btn.className = 'h-14 bg-white border-2 border-primary text-black font-bold flex items-center justify-center rounded shadow-sm hover:bg-yellow-50';
+                    btn.className = 'h-14 lg:h-16 bg-white border-2 border-primary text-black font-bold flex items-center justify-center rounded shadow-sm hover:bg-yellow-50 lg:text-lg transition-colors';
                     btn.innerText = d;
                     btn.onclick = () => selectDate(dateStr);
                     grid.appendChild(btn);
                 } else {
                     const div = document.createElement('div');
-                    div.className = 'h-14 bg-gray-100 text-gray-400 flex items-center justify-center rounded';
+                    div.className = 'h-14 lg:h-16 bg-gray-100 text-gray-400 flex items-center justify-center rounded lg:text-lg';
                     div.innerText = d;
                     grid.appendChild(div);
                 }
