@@ -28,49 +28,49 @@
         input, select, textarea { font-size: 1.125rem; }
     </style>
 </head>
-<body class="bg-gray-100 text-black antialiased">
+<body class="bg-gray-100 text-black antialiased lg:bg-gray-200">
 
-    <!-- PC表示時は中央に適切な幅で表示、スマホは全幅 -->
-    <div class="max-w-md mx-auto lg:max-w-lg xl:max-w-xl bg-white min-h-screen shadow-lg lg:shadow-2xl relative pb-10 lg:my-8 lg:rounded-2xl lg:min-h-0">
+    <!-- スマホは全幅、PCは全画面で見やすく -->
+    <div class="max-w-md mx-auto lg:max-w-4xl xl:max-w-5xl bg-white min-h-screen shadow-lg lg:shadow-2xl relative pb-10 lg:pb-16">
         
-        <header class="bg-primary p-4 lg:p-5 text-center font-bold text-xl lg:text-2xl shadow-sm sticky top-0 z-10 lg:rounded-t-2xl">
+        <header class="bg-primary p-4 lg:p-6 text-center font-bold text-xl lg:text-3xl shadow-sm sticky top-0 z-10">
             バスツアー予約
         </header>
 
-        <div id="screen-b01" class="screen active p-4 md:p-8">
-            <div class="flex items-center justify-between mb-6">
-                <button onclick="changeMonth(-1)" class="text-blue-600 font-bold text-2xl px-4 py-2 hover:bg-gray-100 rounded">&lt;</button>
-                <h2 class="text-xl font-bold" id="calendar-month-title">--年--月</h2>
-                <button onclick="changeMonth(1)" class="text-blue-600 font-bold text-2xl px-4 py-2 hover:bg-gray-100 rounded">&gt;</button>
+        <div id="screen-b01" class="screen active p-4 lg:p-10">
+            <div class="flex items-center justify-between mb-6 lg:mb-10">
+                <button onclick="changeMonth(-1)" class="text-blue-600 font-bold text-2xl lg:text-4xl px-4 py-2 lg:px-6 lg:py-3 hover:bg-gray-100 rounded-lg">&lt;</button>
+                <h2 class="text-xl lg:text-3xl font-bold" id="calendar-month-title">--年--月</h2>
+                <button onclick="changeMonth(1)" class="text-blue-600 font-bold text-2xl lg:text-4xl px-4 py-2 lg:px-6 lg:py-3 hover:bg-gray-100 rounded-lg">&gt;</button>
             </div>
-            <div class="grid grid-cols-7 gap-2 text-center mb-2 font-bold text-gray-600">
+            <div class="grid grid-cols-7 gap-2 lg:gap-3 text-center mb-2 lg:mb-4 font-bold text-gray-600 lg:text-xl">
                 <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
             </div>
-            <div id="calendar-grid" class="grid grid-cols-7 gap-2 text-center">
+            <div id="calendar-grid" class="grid grid-cols-7 gap-2 lg:gap-3 text-center">
                 <div class="h-14 flex items-center justify-center text-gray-400">読み込み中...</div>
             </div>
-            <p class="mt-6 text-sm text-gray-500 text-center">※グレーの日付は選択できません</p>
+            <p class="mt-6 lg:mt-10 text-sm lg:text-lg text-gray-500 text-center">※グレーの日付は選択できません</p>
         </div>
 
-        <div id="screen-b02" class="screen p-4 md:p-8">
-            <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 日付を変更</button>
-            <h2 class="text-xl font-bold mb-4" id="view-date-title">--月--日のツアー</h2>
-            <div id="tour-list" class="space-y-6">
+        <div id="screen-b02" class="screen p-4 lg:p-10">
+            <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 日付を変更</button>
+            <h2 class="text-xl lg:text-3xl font-bold mb-4 lg:mb-8" id="view-date-title">--月--日のツアー</h2>
+            <div id="tour-list" class="space-y-6 lg:space-y-8">
                 <div class="text-center text-gray-400 py-8">読み込み中...</div>
             </div>
         </div>
 
-        <div id="screen-b03" class="screen p-4 md:p-8">
-            <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
-            <h2 class="text-2xl font-bold mb-6">お客様情報の入力</h2>
+        <div id="screen-b03" class="screen p-4 lg:p-10">
+            <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
+            <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">お客様情報の入力</h2>
             <form id="booking-form" onsubmit="event.preventDefault(); submitUserInfo();">
-                <div class="mb-6">
-                    <label class="block text-lg font-bold mb-2">お名前 <span class="text-red-500">*</span></label>
-                    <input type="text" id="input-name" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-gray-50" required>
+                <div class="mb-6 lg:mb-8">
+                    <label class="block text-lg lg:text-2xl font-bold mb-2 lg:mb-3">お名前 <span class="text-red-500">*</span></label>
+                    <input type="text" id="input-name" class="w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-gray-50 lg:text-xl" required>
                 </div>
-                <div class="mb-6">
-                    <label class="block text-lg font-bold mb-2">電話番号 <span class="text-red-500">*</span></label>
-                    <input type="tel" id="input-phone" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-gray-50" required>
+                <div class="mb-6 lg:mb-8">
+                    <label class="block text-lg lg:text-2xl font-bold mb-2 lg:mb-3">電話番号 <span class="text-red-500">*</span></label>
+                    <input type="tel" id="input-phone" class="w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-gray-50 lg:text-xl" required>
                 </div>
                 <div class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
                     <p class="font-bold text-lg mb-4 border-b pb-2">ご住所 <span class="text-red-500">*</span></p>
@@ -116,10 +116,10 @@
             </form>
         </div>
 
-        <div id="screen-b04" class="screen p-4 md:p-8">
-            <button onclick="goTo('screen-b03')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
-            <h2 class="text-2xl font-bold mb-6">乗車場所の選択</h2>
-            <p class="mb-4 font-bold text-lg" id="pickup-count-label">参加人数：--名</p>
+        <div id="screen-b04" class="screen p-4 lg:p-10">
+            <button onclick="goTo('screen-b03')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
+            <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">乗車場所の選択</h2>
+            <p class="mb-4 lg:mb-6 font-bold text-lg lg:text-2xl" id="pickup-count-label">参加人数：--名</p>
             <div id="pickup-mode-selector" class="hidden mb-6 flex-col gap-4">
                 <label class="flex items-center p-4 border rounded-lg bg-white cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-yellow-50 transition">
                     <input type="radio" name="pickup_mode" value="same" class="w-6 h-6" checked onchange="renderPickupDropdowns()">
@@ -130,56 +130,56 @@
                     <span class="ml-3 text-lg font-bold">一人ずつ選ぶ</span>
                 </label>
             </div>
-            <div id="pickup-dropdowns-area" class="space-y-4 mb-8"></div>
-            <button onclick="submitPickups()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-xl shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
+            <div id="pickup-dropdowns-area" class="space-y-4 lg:space-y-6 mb-8 lg:mb-12"></div>
+            <button onclick="submitPickups()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 lg:py-5 rounded-xl text-xl lg:text-2xl shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 transition-colors">
                 確認画面へ
             </button>
         </div>
 
-        <div id="screen-b05" class="screen p-4 md:p-8">
-            <button onclick="goTo('screen-b04')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
-            <h2 class="text-2xl font-bold mb-6">予約内容の確認</h2>
-            <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
-                <div class="mb-4 pb-4 border-b border-gray-300">
-                    <p class="text-gray-600 text-sm">ツアー名</p>
-                    <p class="text-xl font-bold" id="conf-tour">--</p>
+        <div id="screen-b05" class="screen p-4 lg:p-10">
+            <button onclick="goTo('screen-b04')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
+            <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">予約内容の確認</h2>
+            <div class="bg-gray-50 p-6 lg:p-8 rounded-xl border border-gray-200 mb-8 lg:mb-12">
+                <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm lg:text-lg">ツアー名</p>
+                    <p class="text-xl lg:text-2xl font-bold" id="conf-tour">--</p>
                 </div>
-                <div class="mb-4 pb-4 border-b border-gray-300">
-                    <p class="text-gray-600 text-sm">日付</p>
-                    <p class="text-xl font-bold" id="conf-date">--</p>
+                <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm lg:text-lg">日付</p>
+                    <p class="text-xl lg:text-2xl font-bold" id="conf-date">--</p>
                 </div>
-                <div class="mb-4 pb-4 border-b border-gray-300">
-                    <p class="text-gray-600 text-sm">代表者名</p>
-                    <p class="text-xl font-bold" id="conf-name">-- 様</p>
+                <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm lg:text-lg">代表者名</p>
+                    <p class="text-xl lg:text-2xl font-bold" id="conf-name">-- 様</p>
                 </div>
-                <div class="mb-4 pb-4 border-b border-gray-300">
-                    <p class="text-gray-600 text-sm">人数</p>
-                    <p class="text-xl font-bold" id="conf-passengers">--名</p>
+                <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm lg:text-lg">人数</p>
+                    <p class="text-xl lg:text-2xl font-bold" id="conf-passengers">--名</p>
                 </div>
-                <div class="mb-4 pb-4 border-b border-gray-300">
-                    <p class="text-gray-600 text-sm">乗車場所</p>
-                    <div id="conf-pickups" class="font-bold text-lg"></div>
+                <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm lg:text-lg">乗車場所</p>
+                    <div id="conf-pickups" class="font-bold text-lg lg:text-2xl"></div>
                 </div>
-                <div class="mb-4 pb-4 border-b border-gray-300">
-                    <p class="text-gray-600 text-sm">前列座席指定</p>
-                    <div id="conf-seats" class="font-bold text-lg"></div>
+                <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm lg:text-lg">前列座席指定</p>
+                    <div id="conf-seats" class="font-bold text-lg lg:text-2xl"></div>
                 </div>
-                <div class="mt-6 space-y-2">
-                    <div class="flex justify-between text-sm">
+                <div class="mt-6 lg:mt-8 space-y-2 lg:space-y-3">
+                    <div class="flex justify-between text-sm lg:text-xl">
                         <span class="text-gray-600">基本料金</span>
                         <span class="font-bold" id="conf-base-price">¥0</span>
                     </div>
-                    <div class="flex justify-between text-sm">
+                    <div class="flex justify-between text-sm lg:text-xl">
                         <span class="text-gray-600">座席指定料</span>
                         <span class="font-bold" id="conf-seat-price">¥0</span>
                     </div>
-                    <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-300">
-                        <span class="text-lg font-bold">合計金額</span>
-                        <span class="text-3xl font-bold text-red-600" id="conf-total">¥0</span>
+                    <div class="flex justify-between items-center mt-4 lg:mt-6 pt-4 lg:pt-6 border-t border-gray-300">
+                        <span class="text-lg lg:text-2xl font-bold">合計金額</span>
+                        <span class="text-3xl lg:text-4xl font-bold text-red-600" id="conf-total">¥0</span>
                     </div>
                 </div>
             </div>
-            <button id="btn-confirm-reservation" onclick="submitReservation()" class="w-full lg:w-auto lg:px-16 lg:mx-auto lg:block bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-2xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 transition-colors">
+            <button id="btn-confirm-reservation" onclick="submitReservation()" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 lg:py-6 rounded-xl text-2xl lg:text-3xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 transition-colors">
                 予約を確定する
             </button>
         </div>
@@ -311,7 +311,7 @@
             
             for (let i = 0; i < firstDay; i++) {
                 const empty = document.createElement('div');
-                empty.className = 'h-14 lg:h-16';
+                empty.className = 'h-14 lg:h-20';
                 grid.appendChild(empty);
             }
             
@@ -321,13 +321,13 @@
                 
                 if (isAvailable) {
                     const btn = document.createElement('button');
-                    btn.className = 'h-14 lg:h-16 bg-white border-2 border-primary text-black font-bold flex items-center justify-center rounded shadow-sm hover:bg-yellow-50 lg:text-lg transition-colors';
+                    btn.className = 'h-14 lg:h-20 bg-white border-2 lg:border-3 border-primary text-black font-bold flex items-center justify-center rounded lg:rounded-lg shadow-sm hover:bg-yellow-50 lg:text-2xl transition-colors';
                     btn.innerText = d;
                     btn.onclick = () => selectDate(dateStr);
                     grid.appendChild(btn);
                 } else {
                     const div = document.createElement('div');
-                    div.className = 'h-14 lg:h-16 bg-gray-100 text-gray-400 flex items-center justify-center rounded lg:text-lg';
+                    div.className = 'h-14 lg:h-20 bg-gray-100 text-gray-400 flex items-center justify-center rounded lg:rounded-lg lg:text-2xl';
                     div.innerText = d;
                     grid.appendChild(div);
                 }
@@ -359,29 +359,31 @@
             
             tours.forEach(tour => {
                 const card = document.createElement('div');
-                card.className = 'border rounded-xl overflow-hidden shadow-md';
+                card.className = 'border rounded-xl overflow-hidden shadow-md lg:shadow-lg';
                 
                 const isFull = tour.remainingSeats <= 0 || tour.status === 'full';
                 const statusBadge = isFull 
-                    ? '<span class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">満席</span>' 
+                    ? '<span class="absolute top-2 right-2 lg:top-4 lg:right-4 bg-red-500 text-white px-2 py-1 lg:px-4 lg:py-2 rounded text-sm lg:text-lg font-bold">満席</span>' 
                     : '';
+                
+                const escapedTitle = tour.title.replace(/'/g, "\\'");
                 
                 card.innerHTML = `
                     <div class="relative">
                         ${tour.imageUrl 
-                            ? `<img src="${tour.imageUrl}" alt="${tour.title}" class="w-full h-48 object-cover">` 
-                            : '<div class="bg-gray-300 h-48 w-full flex items-center justify-center text-gray-500 font-bold">ツアー画像</div>'}
+                            ? `<img src="${tour.imageUrl}" alt="${tour.title}" class="w-full h-48 lg:h-64 object-cover">` 
+                            : '<div class="bg-gray-300 h-48 lg:h-64 w-full flex items-center justify-center text-gray-500 font-bold lg:text-xl">ツアー画像</div>'}
                         ${statusBadge}
                     </div>
-                    <div class="p-4">
-                        <h3 class="text-xl font-bold mb-2">${tour.title}</h3>
-                        <p class="text-gray-700 mb-2 text-lg">${tour.description || ''}</p>
-                        <p class="text-sm text-gray-500 mb-4">残り ${tour.remainingSeats}席</p>
+                    <div class="p-4 lg:p-6">
+                        <h3 class="text-xl lg:text-2xl font-bold mb-2 lg:mb-3">${tour.title}</h3>
+                        <p class="text-gray-700 mb-2 lg:mb-3 text-lg lg:text-xl">${tour.description || ''}</p>
+                        <p class="text-sm lg:text-lg text-gray-500 mb-4 lg:mb-6">残り ${tour.remainingSeats}席</p>
                         <div class="flex justify-between items-end">
-                            <span class="text-2xl font-bold">¥${tour.price.toLocaleString()}</span>
+                            <span class="text-2xl lg:text-3xl font-bold">¥${tour.price.toLocaleString()}</span>
                             ${isFull 
-                                ? '<span class="bg-gray-300 text-gray-500 font-bold py-3 px-8 rounded-lg text-lg">満席</span>'
-                                : `<button onclick="selectTour('${tour.id}', '${tour.title}', ${tour.price})" class="bg-primary hover:bg-primary-hover text-black font-bold py-3 px-8 rounded-lg text-lg shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">選択する</button>`
+                                ? '<span class="bg-gray-300 text-gray-500 font-bold py-3 px-8 lg:py-4 lg:px-10 rounded-lg text-lg lg:text-xl">満席</span>'
+                                : `<button onclick="selectTour('${tour.id}', '${escapedTitle}', ${tour.price})" class="bg-primary hover:bg-primary-hover text-black font-bold py-3 px-8 lg:py-4 lg:px-10 rounded-lg text-lg lg:text-xl shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 transition-colors">選択する</button>`
                             }
                         </div>
                     </div>
@@ -554,18 +556,18 @@
             area.innerHTML = '';
 
             const container = document.createElement('div');
-            container.className = "p-4 bg-gray-50 rounded-lg border border-gray-200";
+            container.className = "p-4 lg:p-6 bg-gray-50 rounded-lg border border-gray-200";
 
             const label = document.createElement('label');
-            label.className = "flex items-center p-3 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition";
+            label.className = "flex items-center p-3 lg:p-4 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition";
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.id = 'preferred-seat-all';
-            checkbox.className = 'w-5 h-5 text-primary border-gray-300 rounded';
+            checkbox.className = 'w-5 h-5 lg:w-7 lg:h-7 text-primary border-gray-300 rounded';
             
             const labelText = document.createElement('span');
-            labelText.className = 'ml-3 text-lg font-bold';
+            labelText.className = 'ml-3 lg:ml-4 text-lg lg:text-2xl font-bold';
             labelText.innerText = `前列座席を希望する（全員分 +¥${(PREFERRED_SEAT_PRICE * cache.passengers).toLocaleString()}）`;
             
             label.appendChild(checkbox);
@@ -595,12 +597,12 @@
             const wrapper = document.createElement('div');
             
             const label = document.createElement('label');
-            label.className = "block text-lg font-bold mb-2";
+            label.className = "block text-lg lg:text-2xl font-bold mb-2 lg:mb-3";
             label.innerText = "乗車場所を選択";
             wrapper.appendChild(label);
 
             const select = document.createElement('select');
-            select.className = "pickup-select w-full border-2 border-gray-300 p-3 rounded-lg bg-white text-lg h-14";
+            select.className = "pickup-select w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-white text-lg lg:text-2xl h-14 lg:h-16";
             
             PICKUP_OPTIONS.forEach(opt => {
                 const option = document.createElement('option');
