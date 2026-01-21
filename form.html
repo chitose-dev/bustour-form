@@ -29,17 +29,17 @@
         input, select, textarea { font-size: 1.125rem; } 
     </style>
 </head>
-<body class="bg-gray-100 text-black antialiased lg:bg-white">
+<body class="bg-gray-100 text-black antialiased">
 
-    <!-- スマホは中央配置、PCは全幅表示 -->
-    <div class="max-w-md mx-auto lg:max-w-none lg:mx-0 bg-white min-h-screen shadow-lg lg:shadow-none relative pb-10 lg:pb-16">
+    <!-- 全デバイスで全幅表示 -->
+    <div class="bg-white min-h-screen shadow-lg relative pb-10">
         
         <header class="bg-primary p-4 lg:p-6 text-center font-bold text-xl lg:text-3xl shadow-sm sticky top-0 z-10">
             バスツアー予約
         </header>
 
-        <div id="screen-b01" class="screen active p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-4xl lg:mx-auto">
+        <div id="screen-b01" class="screen active p-4">
+            <div>
                 <div class="flex items-center justify-between mb-6 lg:mb-10">
                     <button onclick="changeMonth(-1)" class="text-blue-600 font-bold text-2xl lg:text-4xl px-4 py-2 lg:px-6 lg:py-3 hover:bg-gray-100 rounded-lg">&lt;</button>
                     <h2 class="text-xl lg:text-3xl font-bold" id="calendar-month-title">2026年 1月</h2>
@@ -56,8 +56,8 @@
             </div>
         </div>
 
-        <div id="screen-b02" class="screen p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-4xl lg:mx-auto">
+        <div id="screen-b02" class="screen p-4">
+            <div>
                 <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 日付を変更</button>
                 <h2 class="text-xl lg:text-3xl font-bold mb-4 lg:mb-8" id="view-date-title">--月--日のツアー</h2>
 
@@ -67,8 +67,8 @@
             </div>
         </div>
 
-        <div id="screen-b03" class="screen p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-2xl lg:mx-auto">
+        <div id="screen-b03" class="screen p-4">
+            <div>
                 <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
                 <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">お客様情報の入力</h2>
 
@@ -181,8 +181,8 @@
             </div>
         </div>
 
-        <div id="screen-b04" class="screen p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-2xl lg:mx-auto">
+        <div id="screen-b04" class="screen p-4">
+            <div>
                 <button onclick="goTo('screen-b03')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
                 <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">乗車場所の選択</h2>
                 
@@ -208,8 +208,8 @@
             </div>
         </div>
 
-        <div id="screen-b05" class="screen p-4 lg:px-20 lg:py-10">
-            <div class="lg:max-w-2xl lg:mx-auto">
+        <div id="screen-b05" class="screen p-4">
+            <div>
                 <button onclick="goTo('screen-b04')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
                 <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">予約内容の確認</h2>
 
