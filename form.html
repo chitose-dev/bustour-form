@@ -31,13 +31,13 @@
 </head>
 <body class="bg-gray-100 text-black antialiased">
 
-    <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg relative pb-10">
+    <div class="max-w-md md:max-w-2xl lg:max-w-4xl mx-auto bg-white min-h-screen shadow-lg relative pb-10">
         
         <header class="bg-primary p-4 text-center font-bold text-xl shadow-sm sticky top-0 z-10">
             バスツアー予約
         </header>
 
-        <div id="screen-b01" class="screen active p-4">
+        <div id="screen-b01" class="screen active p-4 md:p-8">
             <div class="flex items-center justify-between mb-6">
                 <button onclick="changeMonth(-1)" class="text-blue-600 font-bold text-2xl px-4 py-2 hover:bg-gray-100 rounded">&lt;</button>
                 <h2 class="text-xl font-bold" id="calendar-month-title">2026年 1月</h2>
@@ -53,7 +53,7 @@
             <p class="mt-6 text-sm text-gray-500 text-center">※グレーの日付は選択できません</p>
         </div>
 
-        <div id="screen-b02" class="screen p-4">
+        <div id="screen-b02" class="screen p-4 md:p-8">
             <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 日付を変更</button>
             <h2 class="text-xl font-bold mb-4" id="view-date-title">--月--日のツアー</h2>
 
@@ -62,7 +62,7 @@
             </div>
         </div>
 
-        <div id="screen-b03" class="screen p-4">
+        <div id="screen-b03" class="screen p-4 md:p-8">
             <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
             <h2 class="text-2xl font-bold mb-6">お客様情報の入力</h2>
 
@@ -174,7 +174,7 @@
             </form>
         </div>
 
-        <div id="screen-b04" class="screen p-4">
+        <div id="screen-b04" class="screen p-4 md:p-8">
             <button onclick="goTo('screen-b03')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
             <h2 class="text-2xl font-bold mb-6">乗車場所の選択</h2>
             
@@ -199,7 +199,7 @@
             </button>
         </div>
 
-        <div id="screen-b05" class="screen p-4">
+        <div id="screen-b05" class="screen p-4 md:p-8">
             <button onclick="goTo('screen-b04')" class="text-blue-600 mb-4 text-lg font-bold">&lt; 戻る</button>
             <h2 class="text-2xl font-bold mb-6">予約内容の確認</h2>
 
