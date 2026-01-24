@@ -55,7 +55,7 @@
         </div>
 
         <div id="screen-b02" class="screen p-4">
-            <div>
+            <div class="max-w-2xl mx-auto">
                 <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 日付を変更</button>
                 <h2 class="text-xl lg:text-3xl font-bold mb-4 lg:mb-8" id="view-date-title">--月--日のツアー</h2>
                 <div id="tour-list" class="space-y-6 lg:space-y-8">
@@ -65,7 +65,7 @@
         </div>
 
         <div id="screen-b03" class="screen p-4">
-            <div>
+            <div class="max-w-2xl mx-auto">
                 <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
                 <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">お客様情報の入力</h2>
                 <form id="booking-form" onsubmit="event.preventDefault(); submitUserInfo();">
@@ -103,7 +103,7 @@
                 </div>
                 <div class="mb-6">
                     <label class="block text-lg font-bold mb-2">参加人数</label>
-                    <select id="input-passengers" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white text-lg">
+                    <select id="input-passengers" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white text-lg" onchange="updatePreferredSeatsUI()">
                         <option value="1">1名</option>
                         <option value="2">2名</option>
                         <option value="3">3名</option>
@@ -418,6 +418,19 @@
             await loadToursForDate(dateStr);
         }
 
+        // ---------------------------------
+        // 自動入力キャッシュチェック（自動ダイアログ表示）
+        // ---------------------------------
+        function checkAutoFillCache() {
+            const saved = localStorage.getItem('user_profile_cache');
+            
+            if (saved) {
+                // キャッシュがある場合：自動でダイアログ表示
+                showAutoFillDialog();
+            }
+            // キャッシュがない場合：何もしない
+        }
+
         function selectTour(tourId, title, price) {
             cache.tourId = tourId;
             cache.tourTitle = title;
@@ -426,12 +439,13 @@
             setupPreferredSeatsUI();
             goTo('screen-b03');
             
-            const saved = localStorage.getItem('user_profile_cache');
-            if (saved) {
-                showAutoFillDialog();
-            }
+            // キャッシュがあれば自動でダイアログ表示
+            checkAutoFillCache();
         }
 
+        // ---------------------------------
+        // B-03 自動入力ダイアログ（ポップアップ形式）
+        // ---------------------------------
         function showAutoFillDialog() {
             const saved = localStorage.getItem('user_profile_cache');
             if (!saved) return;
@@ -586,6 +600,10 @@
 
             area.appendChild(container);
         }
+        
+        function updatePreferredSeatsUI() {
+            setupPreferredSeatsUI();
+        }
 
         function setupPickupScreen() {
             document.getElementById('pickup-count-label').innerText = `参加人数：${cache.passengers}名`;
@@ -669,18 +687,24 @@
             }
         }
 
+        // ---------------------------------
+        // B-06 完了画面を動的に生成
+        // ---------------------------------
         function createCompletionScreen() {
+            // 既存のB-06画面があれば削除
             const existing = document.getElementById('screen-b06');
             if (existing) {
                 existing.remove();
             }
             
+            // 新しいB-06画面を作成
             const screen = document.createElement('div');
             screen.id = 'screen-b06';
             screen.className = 'screen p-8 text-center flex flex-col justify-center min-h-[60vh]';
             screen.innerHTML = `
                 <div class="text-6xl mb-6">✅</div>
                 <h2 class="text-2xl font-bold mb-8">予約を受け付けました</h2>
+                
                 <div class="bg-blue-50 border-2 border-blue-100 p-6 rounded-xl text-left w-full mb-6 space-y-4">
                     <p class="text-base leading-relaxed">
                         弊社が確認後、LINEにて、予約確定通知をお送りいたします。担当者からの連絡をお待ちください。
@@ -692,12 +716,15 @@
                         乗車地「六之本・米原・彦根」は他のお客様を含めて5名以上のお申込みがない場合、変更をお願いする場合がございます。
                     </p>
                 </div>
+
                 <p class="text-xl font-bold text-gray-800">
                     この画面は閉じても大丈夫です。
                 </p>
             `;
             
-            document.querySelector('.max-w-md').appendChild(screen);
+            // DOMに追加（screen-b05の親要素を取得）
+            const container = document.getElementById('screen-b05').parentElement;
+            container.appendChild(screen);
         }
 
         async function submitReservation() {

@@ -57,7 +57,7 @@
         </div>
 
         <div id="screen-b02" class="screen p-4">
-            <div>
+            <div class="max-w-2xl mx-auto">
                 <button onclick="goTo('screen-b01')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 日付を変更</button>
                 <h2 class="text-xl lg:text-3xl font-bold mb-4 lg:mb-8" id="view-date-title">--月--日のツアー</h2>
 
@@ -68,7 +68,7 @@
         </div>
 
         <div id="screen-b03" class="screen p-4">
-            <div>
+            <div class="max-w-2xl mx-auto">
                 <button onclick="goTo('screen-b02')" class="text-blue-600 mb-4 lg:mb-6 text-lg lg:text-2xl font-bold">&lt; 戻る</button>
                 <h2 class="text-2xl lg:text-3xl font-bold mb-6 lg:mb-10">お客様情報の入力</h2>
 
@@ -826,8 +826,9 @@
                 </p>
             `;
             
-            // DOMに追加
-            document.querySelector('.max-w-md').appendChild(screen);
+            // DOMに追加（screen-b05の親要素を取得）
+            const container = document.getElementById('screen-b05').parentElement;
+            container.appendChild(screen);
         }
 
         // ---------------------------------
