@@ -271,12 +271,15 @@
         // ---------------------------------
         const PREFERRED_SEAT_PRICE = 500;
 
-        // 乗車地オプション（静的データ）
+        // 乗車地オプション（sortOrderで表示順を制御）
         const PICKUP_OPTIONS = [
-            "新宿駅 西口",
-            "東京駅 丸の内北口",
-            "横浜駅 東口",
-            "大宮駅 西口"
+            { id: "pickup-001", name: "新宿駅 西口", sortOrder: 1 },
+            { id: "pickup-002", name: "東京駅 丸の内北口", sortOrder: 2 },
+            { id: "pickup-003", name: "横浜駅 東口", sortOrder: 3 },
+            { id: "pickup-004", name: "大宮駅 西口", sortOrder: 4 },
+            { id: "pickup-005", name: "六之本", sortOrder: 5 },
+            { id: "pickup-006", name: "米原駅", sortOrder: 6 },
+            { id: "pickup-007", name: "彦根駅", sortOrder: 7 }
         ];
 
         // ツアーデータ（静的データ）
@@ -290,7 +293,8 @@
                 remainingSeats: 15,
                 imageUrl: "",
                 status: "open",
-                dates: ["2026-01-20", "2026-01-25", "2026-02-01"]
+                dates: ["2026-01-20", "2026-01-25", "2026-02-01"],
+                pickupIds: ["pickup-001", "pickup-002", "pickup-003", "pickup-004"]  // 使用可能な乗車地
             },
             "tour-002": {
                 id: "tour-002",
@@ -301,7 +305,8 @@
                 remainingSeats: 8,
                 imageUrl: "",
                 status: "open",
-                dates: ["2026-01-25", "2026-02-05"]
+                dates: ["2026-01-25", "2026-02-05"],
+                pickupIds: ["pickup-001", "pickup-002"]  // 東京発のみ
             },
             "tour-003": {
                 id: "tour-003",
@@ -312,7 +317,8 @@
                 remainingSeats: 0,
                 imageUrl: "",
                 status: "full",
-                dates: ["2026-01-20"]
+                dates: ["2026-01-20"],
+                pickupIds: ["pickup-005", "pickup-006", "pickup-007"]  // 滋賀発のみ
             }
         };
 
@@ -733,6 +739,13 @@
             const mode = document.querySelector('input[name="pickup_mode"]:checked').value;
             const count = (mode === 'individual') ? cache.passengers : 1;
             
+            // 選択中のツアーに対応する乗車地を取得（sortOrderでソート）
+            const tour = TOURS_DATA[cache.tourId];
+            const availablePickupIds = tour?.pickupIds || [];
+            const availablePickups = PICKUP_OPTIONS
+                .filter(p => availablePickupIds.includes(p.id))
+                .sort((a, b) => a.sortOrder - b.sortOrder);
+            
             for (let i = 0; i < count; i++) {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'mb-4';
@@ -745,10 +758,10 @@
                 const select = document.createElement('select');
                 select.className = "pickup-select w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-white text-lg lg:text-2xl h-14 lg:h-16";
                 
-                PICKUP_OPTIONS.forEach(opt => {
+                availablePickups.forEach(pickup => {
                     const option = document.createElement('option');
-                    option.value = opt;
-                    option.innerText = opt;
+                    option.value = pickup.name;
+                    option.innerText = pickup.name;
                     select.appendChild(option);
                 });
 

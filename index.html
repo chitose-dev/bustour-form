@@ -328,11 +328,21 @@
                 const response = await fetch(`${BOOKING_API_BASE}/pickups`);
                 if (response.ok) {
                     const pickups = await response.json();
-                    PICKUP_OPTIONS = pickups.map(p => p.name);
+                    // APIからは { id, name, sortOrder } 形式で取得
+                    PICKUP_OPTIONS = pickups.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        sortOrder: p.sortOrder || 0
+                    }));
                 }
             } catch (err) {
                 console.error("Failed to load pickups:", err);
-                PICKUP_OPTIONS = ["新宿駅 西口", "東京駅 丸の内北口", "横浜駅 東口"];
+                // デフォルト値（sortOrder付き）
+                PICKUP_OPTIONS = [
+                    { id: "pickup-001", name: "新宿駅 西口", sortOrder: 1 },
+                    { id: "pickup-002", name: "東京駅 丸の内北口", sortOrder: 2 },
+                    { id: "pickup-003", name: "横浜駅 東口", sortOrder: 3 }
+                ];
             }
         }
 
@@ -676,6 +686,20 @@
             const mode = document.querySelector('input[name="pickup_mode"]:checked').value;
             const count = (mode === 'individual') ? cache.passengers : 1;
             
+            // 選択中のツアーに対応する乗車地を取得（sortOrderでソート）
+            const tour = toursData[cache.tourId];
+            const availablePickupIds = tour?.pickupIds || [];
+            
+            // pickupIdsが設定されていればフィルタ、なければ全て表示
+            let availablePickups;
+            if (availablePickupIds.length > 0) {
+                availablePickups = PICKUP_OPTIONS
+                    .filter(p => availablePickupIds.includes(p.id))
+                    .sort((a, b) => a.sortOrder - b.sortOrder);
+            } else {
+                availablePickups = [...PICKUP_OPTIONS].sort((a, b) => a.sortOrder - b.sortOrder);
+            }
+            
             for (let i = 0; i < count; i++) {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'mb-4';
@@ -688,10 +712,10 @@
                 const select = document.createElement('select');
                 select.className = "pickup-select w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-white text-lg lg:text-2xl h-14 lg:h-16";
                 
-                PICKUP_OPTIONS.forEach(opt => {
+                availablePickups.forEach(pickup => {
                     const option = document.createElement('option');
-                    option.value = opt;
-                    option.innerText = opt;
+                    option.value = pickup.name;
+                    option.innerText = pickup.name;
                     select.appendChild(option);
                 });
 
