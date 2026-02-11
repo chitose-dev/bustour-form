@@ -87,9 +87,53 @@
                         <label class="block text-sm font-bold mb-1 text-gray-600">都道府県</label>
                         <select id="input-pref" class="w-full border-2 border-gray-300 p-3 rounded-lg bg-white h-14">
                             <option value="">選択してください</option>
+                            <option value="北海道">北海道</option>
+                            <option value="青森県">青森県</option>
+                            <option value="岩手県">岩手県</option>
+                            <option value="宮城県">宮城県</option>
+                            <option value="秋田県">秋田県</option>
+                            <option value="山形県">山形県</option>
+                            <option value="福島県">福島県</option>
+                            <option value="茨城県">茨城県</option>
+                            <option value="栃木県">栃木県</option>
+                            <option value="群馬県">群馬県</option>
+                            <option value="埼玉県">埼玉県</option>
+                            <option value="千葉県">千葉県</option>
                             <option value="東京都">東京都</option>
                             <option value="神奈川県">神奈川県</option>
-                            <option value="埼玉県">埼玉県</option>
+                            <option value="新潟県">新潟県</option>
+                            <option value="富山県">富山県</option>
+                            <option value="石川県">石川県</option>
+                            <option value="福井県">福井県</option>
+                            <option value="山梨県">山梨県</option>
+                            <option value="長野県">長野県</option>
+                            <option value="岐阜県">岐阜県</option>
+                            <option value="静岡県">静岡県</option>
+                            <option value="愛知県">愛知県</option>
+                            <option value="三重県">三重県</option>
+                            <option value="滋賀県">滋賀県</option>
+                            <option value="京都府">京都府</option>
+                            <option value="大阪府">大阪府</option>
+                            <option value="兵庫県">兵庫県</option>
+                            <option value="奈良県">奈良県</option>
+                            <option value="和歌山県">和歌山県</option>
+                            <option value="鳥取県">鳥取県</option>
+                            <option value="島根県">島根県</option>
+                            <option value="岡山県">岡山県</option>
+                            <option value="広島県">広島県</option>
+                            <option value="山口県">山口県</option>
+                            <option value="徳島県">徳島県</option>
+                            <option value="香川県">香川県</option>
+                            <option value="愛媛県">愛媛県</option>
+                            <option value="高知県">高知県</option>
+                            <option value="福岡県">福岡県</option>
+                            <option value="佐賀県">佐賀県</option>
+                            <option value="長崎県">長崎県</option>
+                            <option value="熊本県">熊本県</option>
+                            <option value="大分県">大分県</option>
+                            <option value="宮崎県">宮崎県</option>
+                            <option value="鹿児島県">鹿児島県</option>
+                            <option value="沖縄県">沖縄県</option>
                         </select>
                     </div>
                     <div class="mb-4">
@@ -284,11 +328,21 @@
                 const response = await fetch(`${BOOKING_API_BASE}/pickups`);
                 if (response.ok) {
                     const pickups = await response.json();
-                    PICKUP_OPTIONS = pickups.map(p => p.name);
+                    // APIからは { id, name, sortOrder } 形式で取得
+                    PICKUP_OPTIONS = pickups.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        sortOrder: p.sortOrder || 0
+                    }));
                 }
             } catch (err) {
                 console.error("Failed to load pickups:", err);
-                PICKUP_OPTIONS = ["新宿駅 西口", "東京駅 丸の内北口", "横浜駅 東口"];
+                // デフォルト値（sortOrder付き）
+                PICKUP_OPTIONS = [
+                    { id: "pickup-001", name: "新宿駅 西口", sortOrder: 1 },
+                    { id: "pickup-002", name: "東京駅 丸の内北口", sortOrder: 2 },
+                    { id: "pickup-003", name: "横浜駅 東口", sortOrder: 3 }
+                ];
             }
         }
 
@@ -608,10 +662,18 @@
         function setupPickupScreen() {
             document.getElementById('pickup-count-label').innerText = `参加人数：${cache.passengers}名`;
             
-            // 常に「全員同じ場所から乗車」モードに固定
             const modeSelector = document.getElementById('pickup-mode-selector');
-            modeSelector.classList.add('hidden');
-            modeSelector.classList.remove('flex');
+            
+            // 2名以上の場合は選択肢を表示
+            if (cache.passengers >= 2) {
+                modeSelector.classList.remove('hidden');
+                modeSelector.classList.add('flex');
+            } else {
+                modeSelector.classList.add('hidden');
+                modeSelector.classList.remove('flex');
+            }
+            
+            // デフォルトは「全員同じ」
             document.querySelector('input[name="pickup_mode"][value="same"]').checked = true;
             
             renderPickupDropdowns();
@@ -621,26 +683,45 @@
             const area = document.getElementById('pickup-dropdowns-area');
             area.innerHTML = '';
             
-            // 常に1つのドロップダウンのみ表示（全員同じ場所）
-            const wrapper = document.createElement('div');
+            const mode = document.querySelector('input[name="pickup_mode"]:checked').value;
+            const count = (mode === 'individual') ? cache.passengers : 1;
             
-            const label = document.createElement('label');
-            label.className = "block text-lg lg:text-2xl font-bold mb-2 lg:mb-3";
-            label.innerText = "乗車場所を選択";
-            wrapper.appendChild(label);
-
-            const select = document.createElement('select');
-            select.className = "pickup-select w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-white text-lg lg:text-2xl h-14 lg:h-16";
+            // 選択中のツアーに対応する乗車地を取得（sortOrderでソート）
+            const tour = toursData[cache.tourId];
+            const availablePickupIds = tour?.pickupIds || [];
             
-            PICKUP_OPTIONS.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt;
-                option.innerText = opt;
-                select.appendChild(option);
-            });
+            // pickupIdsが設定されていればフィルタ、なければ全て表示
+            let availablePickups;
+            if (availablePickupIds.length > 0) {
+                availablePickups = PICKUP_OPTIONS
+                    .filter(p => availablePickupIds.includes(p.id))
+                    .sort((a, b) => a.sortOrder - b.sortOrder);
+            } else {
+                availablePickups = [...PICKUP_OPTIONS].sort((a, b) => a.sortOrder - b.sortOrder);
+            }
+            
+            for (let i = 0; i < count; i++) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mb-4';
+                
+                const label = document.createElement('label');
+                label.className = "block text-lg lg:text-2xl font-bold mb-2 lg:mb-3";
+                label.innerText = (count === 1) ? "乗車場所を選択" : `${i + 1}人目の乗車場所`;
+                wrapper.appendChild(label);
 
-            wrapper.appendChild(select);
-            area.appendChild(wrapper);
+                const select = document.createElement('select');
+                select.className = "pickup-select w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-white text-lg lg:text-2xl h-14 lg:h-16";
+                
+                availablePickups.forEach(pickup => {
+                    const option = document.createElement('option');
+                    option.value = pickup.name;
+                    option.innerText = pickup.name;
+                    select.appendChild(option);
+                });
+
+                wrapper.appendChild(select);
+                area.appendChild(wrapper);
+            }
         }
 
         function submitPickups() {
@@ -669,8 +750,16 @@
             const pickupContainer = document.getElementById('conf-pickups');
             pickupContainer.innerHTML = '';
             
-            // 常に全員同じ乗車場所として表示
-            pickupContainer.innerText = cache.pickups[0];
+            // 乗車場所の表示（全員同じ or 個別）
+            if (cache.pickups.length === 1 || cache.pickups.every(p => p === cache.pickups[0])) {
+                pickupContainer.innerText = cache.pickups[0];
+            } else {
+                cache.pickups.forEach((pickup, idx) => {
+                    const p = document.createElement('p');
+                    p.innerText = `${idx + 1}人目：${pickup}`;
+                    pickupContainer.appendChild(p);
+                });
+            }
 
             const seatContainer = document.getElementById('conf-seats');
             seatContainer.innerHTML = '';
@@ -714,6 +803,9 @@
                     </p>
                     <p class="text-base leading-relaxed">
                         乗車地「六之本・米原・彦根」は他のお客様を含めて5名以上のお申込みがない場合、変更をお願いする場合がございます。
+                    </p>
+                    <p class="text-base leading-relaxed font-bold text-red-600">
+                        キャンセルは公式LINEからご連絡ください。
                     </p>
                 </div>
 

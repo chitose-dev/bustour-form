@@ -271,12 +271,15 @@
         // ---------------------------------
         const PREFERRED_SEAT_PRICE = 500;
 
-        // 乗車地オプション（静的データ）
+        // 乗車地オプション（sortOrderで表示順を制御）
         const PICKUP_OPTIONS = [
-            "新宿駅 西口",
-            "東京駅 丸の内北口",
-            "横浜駅 東口",
-            "大宮駅 西口"
+            { id: "pickup-001", name: "新宿駅 西口", sortOrder: 1 },
+            { id: "pickup-002", name: "東京駅 丸の内北口", sortOrder: 2 },
+            { id: "pickup-003", name: "横浜駅 東口", sortOrder: 3 },
+            { id: "pickup-004", name: "大宮駅 西口", sortOrder: 4 },
+            { id: "pickup-005", name: "六之本", sortOrder: 5 },
+            { id: "pickup-006", name: "米原駅", sortOrder: 6 },
+            { id: "pickup-007", name: "彦根駅", sortOrder: 7 }
         ];
 
         // ツアーデータ（静的データ）
@@ -290,7 +293,8 @@
                 remainingSeats: 15,
                 imageUrl: "",
                 status: "open",
-                dates: ["2026-01-20", "2026-01-25", "2026-02-01"]
+                dates: ["2026-01-20", "2026-01-25", "2026-02-01"],
+                pickupIds: ["pickup-001", "pickup-002", "pickup-003", "pickup-004"]  // 使用可能な乗車地
             },
             "tour-002": {
                 id: "tour-002",
@@ -301,7 +305,8 @@
                 remainingSeats: 8,
                 imageUrl: "",
                 status: "open",
-                dates: ["2026-01-25", "2026-02-05"]
+                dates: ["2026-01-25", "2026-02-05"],
+                pickupIds: ["pickup-001", "pickup-002"]  // 東京発のみ
             },
             "tour-003": {
                 id: "tour-003",
@@ -312,7 +317,8 @@
                 remainingSeats: 0,
                 imageUrl: "",
                 status: "full",
-                dates: ["2026-01-20"]
+                dates: ["2026-01-20"],
+                pickupIds: ["pickup-005", "pickup-006", "pickup-007"]  // 滋賀発のみ
             }
         };
 
@@ -709,10 +715,18 @@
         function setupPickupScreen() {
             document.getElementById('pickup-count-label').innerText = `参加人数：${cache.passengers}名`;
             
-            // 常に「全員同じ場所から乗車」モードに固定
             const modeSelector = document.getElementById('pickup-mode-selector');
-            modeSelector.classList.add('hidden');
-            modeSelector.classList.remove('flex');
+            
+            // 2名以上の場合は選択肢を表示
+            if (cache.passengers >= 2) {
+                modeSelector.classList.remove('hidden');
+                modeSelector.classList.add('flex');
+            } else {
+                modeSelector.classList.add('hidden');
+                modeSelector.classList.remove('flex');
+            }
+            
+            // デフォルトは「全員同じ」
             document.querySelector('input[name="pickup_mode"][value="same"]').checked = true;
             
             renderPickupDropdowns();
@@ -722,26 +736,38 @@
             const area = document.getElementById('pickup-dropdowns-area');
             area.innerHTML = '';
             
-            // 常に1つのドロップダウンのみ表示（全員同じ場所）
-            const wrapper = document.createElement('div');
+            const mode = document.querySelector('input[name="pickup_mode"]:checked').value;
+            const count = (mode === 'individual') ? cache.passengers : 1;
             
-            const label = document.createElement('label');
-            label.className = "block text-lg lg:text-2xl font-bold mb-2 lg:mb-3";
-            label.innerText = "乗車場所を選択";
-            wrapper.appendChild(label);
-
-            const select = document.createElement('select');
-            select.className = "pickup-select w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-white text-lg lg:text-2xl h-14 lg:h-16";
+            // 選択中のツアーに対応する乗車地を取得（sortOrderでソート）
+            const tour = TOURS_DATA[cache.tourId];
+            const availablePickupIds = tour?.pickupIds || [];
+            const availablePickups = PICKUP_OPTIONS
+                .filter(p => availablePickupIds.includes(p.id))
+                .sort((a, b) => a.sortOrder - b.sortOrder);
             
-            PICKUP_OPTIONS.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt;
-                option.innerText = opt;
-                select.appendChild(option);
-            });
+            for (let i = 0; i < count; i++) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mb-4';
+                
+                const label = document.createElement('label');
+                label.className = "block text-lg lg:text-2xl font-bold mb-2 lg:mb-3";
+                label.innerText = (count === 1) ? "乗車場所を選択" : `${i + 1}人目の乗車場所`;
+                wrapper.appendChild(label);
 
-            wrapper.appendChild(select);
-            area.appendChild(wrapper);
+                const select = document.createElement('select');
+                select.className = "pickup-select w-full border-2 border-gray-300 p-3 lg:p-4 rounded-lg bg-white text-lg lg:text-2xl h-14 lg:h-16";
+                
+                availablePickups.forEach(pickup => {
+                    const option = document.createElement('option');
+                    option.value = pickup.name;
+                    option.innerText = pickup.name;
+                    select.appendChild(option);
+                });
+
+                wrapper.appendChild(select);
+                area.appendChild(wrapper);
+            }
         }
 
         function submitPickups() {
@@ -773,8 +799,16 @@
             const pickupContainer = document.getElementById('conf-pickups');
             pickupContainer.innerHTML = '';
             
-            // 常に全員同じ乗車場所として表示
-            pickupContainer.innerText = cache.pickups[0];
+            // 乗車場所の表示（全員同じ or 個別）
+            if (cache.pickups.length === 1 || cache.pickups.every(p => p === cache.pickups[0])) {
+                pickupContainer.innerText = cache.pickups[0];
+            } else {
+                cache.pickups.forEach((pickup, idx) => {
+                    const p = document.createElement('p');
+                    p.innerText = `${idx + 1}人目：${pickup}`;
+                    pickupContainer.appendChild(p);
+                });
+            }
 
             const seatContainer = document.getElementById('conf-seats');
             seatContainer.innerHTML = '';
@@ -818,6 +852,9 @@
                     </p>
                     <p class="text-base leading-relaxed">
                         乗車地「六之本・米原・彦根」は他のお客様を含めて5名以上のお申込みがない場合、変更をお願いする場合がございます。
+                    </p>
+                    <p class="text-base leading-relaxed font-bold text-red-600">
+                        キャンセルは公式LINEからご連絡ください。
                     </p>
                 </div>
 
