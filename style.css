@@ -37,3 +37,11 @@ tbody tr:hover {
 .modal-overlay {
     transition: opacity 0.2s ease-in-out;
 }
+
+/* モバイル用 サイドバー遷移 */
+@media (max-width: 1023px) {
+    #sidebar {
+        top: 0;
+    }
+    /* モバイルヘッダーがあるためサイドバーの上部ロゴを非表示にする必要はない */
+}
