@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gray-100 text-black font-sans antialiased h-screen flex flex-col overflow-hidden">
+<body class="bg-gray-100 text-black font-sans antialiased h-safe-screen flex flex-col overflow-hidden">
 
     <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-800">
         <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
@@ -88,7 +88,7 @@
             </div>
         </aside>
 
-        <main class="flex-1 overflow-auto bg-gray-50 relative pt-14 lg:pt-0">
+        <main class="flex-1 min-h-0 overflow-auto bg-gray-50 relative pt-14 lg:pt-0">
             
             <section id="view-reservations" class="content-view p-4 lg:p-8">
                 <h2 class="text-xl lg:text-2xl font-bold mb-4 lg:mb-6 flex items-center gap-2">
@@ -99,15 +99,17 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 items-end">
                         <div>
                             <label class="block text-sm font-bold text-gray-600 mb-1">ツアー名</label>
-                            <input type="text" id="filter-tour-name" class="w-full border p-2 rounded" placeholder="部分一致検索">
+                            <select id="filter-tour-name" class="w-full border p-2 rounded bg-white" onchange="loadReservations()">
+                                <option value="">すべてのツアー</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-gray-600 mb-1">日付</label>
-                            <input type="date" id="filter-date" class="w-full border p-2 rounded">
+                            <input type="date" id="filter-date" class="w-full border p-2 rounded" onchange="loadReservations()">
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-gray-600 mb-1">ステータス</label>
-                            <select id="filter-status" class="w-full border p-2 rounded">
+                            <select id="filter-status" class="w-full border p-2 rounded" onchange="loadReservations()">
                                 <option value="all">全て</option>
                                 <option value="confirmed">確定 (confirmed)</option>
                                 <option value="cancelled">キャンセル (cancelled)</option>
