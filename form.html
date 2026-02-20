@@ -227,6 +227,14 @@
                     <p class="text-xl lg:text-2xl font-bold" id="conf-name">-- 様</p>
                 </div>
                 <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm lg:text-lg">電話番号</p>
+                    <p class="text-xl lg:text-2xl font-bold" id="conf-phone">--</p>
+                </div>
+                <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
+                    <p class="text-gray-600 text-sm lg:text-lg">住所</p>
+                    <p class="text-lg lg:text-xl font-bold" id="conf-address">--</p>
+                </div>
+                <div class="mb-4 lg:mb-6 pb-4 lg:pb-6 border-b border-gray-300">
                     <p class="text-gray-600 text-sm lg:text-lg">人数</p>
                     <p class="text-xl lg:text-2xl font-bold" id="conf-passengers">--名</p>
                 </div>
@@ -779,12 +787,23 @@
         }
 
         // ---------------------------------
+        // 日付フォーマットヘルパー
+        // ---------------------------------
+        function formatDateJP(dateStr) {
+            const [y, m, d] = dateStr.split('-');
+            return `${y}年${parseInt(m)}月${parseInt(d)}日`;
+        }
+
+        // ---------------------------------
         // B-05 処理
         // ---------------------------------
         function setupConfirmScreen() {
             document.getElementById('conf-tour').innerText = cache.tourTitle;
-            document.getElementById('conf-date').innerText = cache.date;
+            document.getElementById('conf-date').innerText = formatDateJP(cache.date);
             document.getElementById('conf-name').innerText = cache.userInfo.name + " 様";
+            document.getElementById('conf-phone').innerText = cache.userInfo.phone;
+            const address = (cache.userInfo.pref || '') + (cache.userInfo.city || '') + (cache.userInfo.street || '');
+            document.getElementById('conf-address').innerText = address || '未入力';
             document.getElementById('conf-passengers').innerText = cache.passengers + "名";
             
             const baseTour = cache.pricePerPerson * cache.passengers;
