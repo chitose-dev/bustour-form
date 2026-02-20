@@ -125,7 +125,22 @@ async function loadInitialData() {
         cachedPickups = await resPick.json();
     }
 
+    populateFilterTourDropdown();
     switchTab('reservations');
+}
+
+// フィルター用ツアープルダウンを生成
+function populateFilterTourDropdown() {
+    const select = document.getElementById('filter-tour-name');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">すべてのツアー</option>';
+    cachedTours.forEach(function(t) {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.date + ' ： ' + t.title;
+        select.appendChild(opt);
+    });
+    select.value = currentVal;
 }
 
 // ==========================================
@@ -179,15 +194,15 @@ function closeModal(modalId) {
 // 4. 予約台帳機能 (A-02/A-03)
 // ==========================================
 function loadReservations() {
-    const filterName = document.getElementById('filter-tour-name').value.toLowerCase();
+    const filterTourId = document.getElementById('filter-tour-name').value;
     const filterDate = document.getElementById('filter-date').value;
     const filterStatus = document.getElementById('filter-status').value;
 
     let filtered = cachedReservations.filter(function(r) {
-        const matchName = !filterName || r.tour_name.toLowerCase().includes(filterName);
+        const matchTour = !filterTourId || r.tour_id === filterTourId;
         const matchDate = !filterDate || r.date === filterDate;
         const matchStatus = filterStatus === 'all' || r.status === filterStatus;
-        return matchName && matchDate && matchStatus;
+        return matchTour && matchDate && matchStatus;
     });
 
     let totalPeople = 0;
