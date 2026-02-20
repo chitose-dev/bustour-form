@@ -42,7 +42,21 @@
 
     <div id="dashboard-screen" class="flex h-full hidden">
         
-        <aside class="w-64 bg-sidebar text-white flex flex-col shadow-xl">
+        <!-- モバイルヘッダー -->
+        <div class="lg:hidden fixed top-0 left-0 right-0 bg-gray-900 text-white flex items-center justify-between px-4 py-3 z-40 shadow-lg">
+            <button onclick="toggleSidebar()" class="text-2xl p-1" id="hamburger-btn">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <span class="font-bold text-primary text-lg"><i class="fa-solid fa-bus mr-1"></i> 管理パネル</span>
+            <button onclick="logout()" class="text-gray-400 hover:text-white text-sm">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+        </div>
+
+        <!-- オーバーレイ -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+        <aside id="sidebar" class="w-64 bg-sidebar text-white flex flex-col shadow-xl fixed lg:static inset-y-0 left-0 z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300">
             <div class="p-6 bg-gray-900 font-bold text-xl text-primary flex items-center gap-2">
                 <i class="fa-solid fa-bus"></i> 管理パネル
             </div>
@@ -50,17 +64,17 @@
             <nav class="flex-1 py-4">
                 <ul>
                     <li>
-                        <button onclick="switchTab('reservations')" class="nav-item w-full text-left px-6 py-4 hover:bg-gray-700 transition flex items-center gap-3 active-nav">
+                        <button onclick="switchTab('reservations'); closeSidebarMobile()" class="nav-item w-full text-left px-6 py-4 hover:bg-gray-700 transition flex items-center gap-3 active-nav">
                             <i class="fa-solid fa-list"></i> 予約台帳
                         </button>
                     </li>
                     <li>
-                        <button onclick="switchTab('tours')" class="nav-item w-full text-left px-6 py-4 hover:bg-gray-700 transition flex items-center gap-3">
+                        <button onclick="switchTab('tours'); closeSidebarMobile()" class="nav-item w-full text-left px-6 py-4 hover:bg-gray-700 transition flex items-center gap-3">
                             <i class="fa-solid fa-calendar-days"></i> ツアー管理
                         </button>
                     </li>
                     <li>
-                        <button onclick="switchTab('pickups')" class="nav-item w-full text-left px-6 py-4 hover:bg-gray-700 transition flex items-center gap-3">
+                        <button onclick="switchTab('pickups'); closeSidebarMobile()" class="nav-item w-full text-left px-6 py-4 hover:bg-gray-700 transition flex items-center gap-3">
                             <i class="fa-solid fa-map-location-dot"></i> 乗車地管理
                         </button>
                     </li>
@@ -74,15 +88,15 @@
             </div>
         </aside>
 
-        <main class="flex-1 overflow-auto bg-gray-50 relative">
+        <main class="flex-1 overflow-auto bg-gray-50 relative pt-14 lg:pt-0">
             
-            <section id="view-reservations" class="content-view p-8">
-                <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+            <section id="view-reservations" class="content-view p-4 lg:p-8">
+                <h2 class="text-xl lg:text-2xl font-bold mb-4 lg:mb-6 flex items-center gap-2">
                     <span class="bg-primary w-2 h-8 rounded"></span> 予約台帳・集計
                 </h2>
 
-                <div class="bg-white p-6 rounded-lg shadow-sm mb-6 border border-gray-200">
-                    <div class="grid grid-cols-3 gap-4 items-end">
+                <div class="bg-white p-4 lg:p-6 rounded-lg shadow-sm mb-4 lg:mb-6 border border-gray-200">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 items-end">
                         <div>
                             <label class="block text-sm font-bold text-gray-600 mb-1">ツアー名</label>
                             <input type="text" id="filter-tour-name" class="w-full border p-2 rounded" placeholder="部分一致検索">
@@ -99,41 +113,42 @@
                                 <option value="cancelled">キャンセル (cancelled)</option>
                             </select>
                         </div>
-                        <button onclick="loadReservations()" class="bg-gray-800 text-white font-bold py-2 px-4 rounded hover:bg-gray-700 col-span-3">
+                        <button onclick="loadReservations()" class="bg-gray-800 text-white font-bold py-2 px-4 rounded hover:bg-gray-700 sm:col-span-2 lg:col-span-3">
                             <i class="fa-solid fa-filter"></i> 絞り込み
                         </button>
                     </div>
                 </div>
 
-                <div class="flex gap-4 mb-6">
-                    <div class="bg-blue-600 text-white p-4 rounded-lg shadow-md flex-1">
+                <div class="flex flex-col sm:flex-row gap-3 lg:gap-4 mb-4 lg:mb-6">
+                    <div class="bg-blue-600 text-white p-3 lg:p-4 rounded-lg shadow-md flex-1">
                         <p class="text-sm opacity-80">予約人数合計</p>
-                        <p class="text-3xl font-bold" id="summary-people">0名</p>
+                        <p class="text-2xl lg:text-3xl font-bold" id="summary-people">0名</p>
                     </div>
-                    <div class="bg-green-600 text-white p-4 rounded-lg shadow-md flex-1">
+                    <div class="bg-green-600 text-white p-3 lg:p-4 rounded-lg shadow-md flex-1">
                         <p class="text-sm opacity-80">売上合計金額</p>
-                        <p class="text-3xl font-bold" id="summary-sales">¥0</p>
+                        <p class="text-2xl lg:text-3xl font-bold" id="summary-sales">¥0</p>
                     </div>
                     <div class="flex-1 flex items-center justify-end">
-                        <button onclick="openModal('modal-add-reservation')" class="bg-primary hover:bg-primary-hover text-black font-bold py-3 px-6 rounded-lg shadow border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
+                        <button onclick="openModal('modal-add-reservation')" class="w-full sm:w-auto bg-primary hover:bg-primary-hover text-black font-bold py-3 px-6 rounded-lg shadow border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
                             + 手動予約追加
                         </button>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-                    <table class="w-full text-left border-collapse">
+                <div class="bg-white rounded-lg shadow overflow-x-auto border border-gray-200">
+                    <table class="w-full text-left border-collapse min-w-[800px]">
                         <thead class="bg-gray-100 border-b-2 border-gray-300">
                             <tr>
-                                <th class="p-4 font-bold text-gray-600">ID</th>
-                                <th class="p-4 font-bold text-gray-600">ツアー日</th>
-                                <th class="p-4 font-bold text-gray-600">ツアー名</th>
-                                <th class="p-4 font-bold text-gray-600">氏名</th>
-                                <th class="p-4 font-bold text-gray-600">人数</th>
-                                <th class="p-4 font-bold text-gray-600">前列座席</th>
-                                <th class="p-4 font-bold text-gray-600">金額</th>
-                                <th class="p-4 font-bold text-gray-600">状態</th>
-                                <th class="p-4 font-bold text-gray-600">操作</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ID</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ツアー日</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ツアー名</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">氏名</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">人数</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">乗車地</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">前列</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">金額</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">状態</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">操作</th>
                             </tr>
                         </thead>
                         <tbody id="reservations-table-body" class="divide-y divide-gray-100">
@@ -142,40 +157,42 @@
                 </div>
             </section>
 
-            <section id="view-tours" class="content-view p-8 hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold flex items-center gap-2">
+            <section id="view-tours" class="content-view p-4 lg:p-8 hidden">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+                    <h2 class="text-xl lg:text-2xl font-bold flex items-center gap-2">
                         <span class="bg-primary w-2 h-8 rounded"></span> ツアー管理
                     </h2>
-                    <button onclick="openModal('modal-tour-editor')" class="bg-primary hover:bg-primary-hover text-black font-bold py-2 px-6 rounded-lg shadow border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
+                    <button onclick="openModal('modal-tour-editor')" class="w-full sm:w-auto bg-primary hover:bg-primary-hover text-black font-bold py-2 px-6 rounded-lg shadow border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
                         + 新規ツアー作成
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="tours-grid">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6" id="tours-grid">
                     </div>
             </section>
 
-            <section id="view-pickups" class="content-view p-8 hidden">
-                <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+            <section id="view-pickups" class="content-view p-4 lg:p-8 hidden">
+                <h2 class="text-xl lg:text-2xl font-bold mb-4 lg:mb-6 flex items-center gap-2">
                     <span class="bg-primary w-2 h-8 rounded"></span> 乗車地マスタ管理
                 </h2>
                 
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div class="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200 mb-4 lg:mb-6">
                     <h3 class="font-bold mb-4">新規追加</h3>
-                    <div class="flex gap-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
                         <input type="text" id="new-pickup-name" class="flex-1 border-2 border-gray-300 p-2 rounded" placeholder="乗車地名 (例: 新宿駅 西口)">
+                        <input type="number" id="new-pickup-sort" class="w-full sm:w-24 border-2 border-gray-300 p-2 rounded" placeholder="表示順" min="1">
                         <button onclick="addPickup()" class="bg-gray-800 text-white font-bold py-2 px-6 rounded hover:bg-gray-700">追加</button>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-                    <table class="w-full text-left">
+                <div class="bg-white rounded-lg shadow overflow-x-auto border border-gray-200">
+                    <table class="w-full text-left min-w-[500px]">
                         <thead class="bg-gray-100 border-b">
                             <tr>
-                                <th class="p-4">乗車地名</th>
-                                <th class="p-4">状態</th>
-                                <th class="p-4">操作</th>
+                                <th class="p-3 lg:p-4 text-sm font-bold text-gray-600">表示順</th>
+                                <th class="p-3 lg:p-4 text-sm font-bold text-gray-600">乗車地名</th>
+                                <th class="p-3 lg:p-4 text-sm font-bold text-gray-600">状態</th>
+                                <th class="p-3 lg:p-4 text-sm font-bold text-gray-600">操作</th>
                             </tr>
                         </thead>
                         <tbody id="pickups-table-body" class="divide-y">
@@ -187,8 +204,9 @@
         </main>
     </div>
 
-    <div id="modal-add-reservation" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-xl w-full max-w-lg shadow-2xl relative">
+    <!-- 手動予約追加モーダル -->
+    <div id="modal-add-reservation" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 lg:p-8 rounded-xl w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <h3 class="text-xl font-bold mb-4 border-b pb-2">手動予約追加 (電話/メール)</h3>
             <form id="form-manual-reservation" onsubmit="event.preventDefault(); submitManualReservation();">
                 <div class="space-y-4">
@@ -202,8 +220,12 @@
                         <input type="text" id="manual-name" class="w-full border p-2 rounded" required>
                     </div>
                     <div>
-                        <label class="block font-bold text-sm mb-1">連絡先 (電話/Mail)</label>
-                        <input type="text" id="manual-contact" class="w-full border p-2 rounded" required>
+                        <label class="block font-bold text-sm mb-1">電話番号</label>
+                        <input type="tel" id="manual-phone" class="w-full border p-2 rounded" required>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-sm mb-1">住所</label>
+                        <input type="text" id="manual-address" class="w-full border p-2 rounded" placeholder="例: 東京都新宿区...">
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -215,6 +237,19 @@
                             <input type="number" id="manual-price" class="w-full border p-2 rounded" placeholder="自動計算なし" required>
                         </div>
                     </div>
+                    <div>
+                        <label class="block font-bold text-sm mb-1">乗車地</label>
+                        <select id="manual-pickup" class="w-full border p-2 rounded bg-white">
+                            <option value="">未選択</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-sm mb-1">前列座席指定</label>
+                        <select id="manual-seat-pref" class="w-full border p-2 rounded bg-white">
+                            <option value="なし">なし</option>
+                            <option value="あり">あり（全員分）</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" onclick="closeModal('modal-add-reservation')" class="px-4 py-2 bg-gray-200 rounded font-bold">キャンセル</button>
@@ -225,8 +260,22 @@
         </div>
     </div>
 
-    <div id="modal-tour-editor" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-xl w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
+    <!-- 予約詳細モーダル -->
+    <div id="modal-reservation-detail" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 lg:p-8 rounded-xl w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4 border-b pb-2">予約詳細</h3>
+            <div id="reservation-detail-body" class="space-y-3">
+                <!-- 動的に描画 -->
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button type="button" onclick="closeModal('modal-reservation-detail')" class="px-4 py-2 bg-gray-200 rounded font-bold">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ツアー編集モーダル -->
+    <div id="modal-tour-editor" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 lg:p-8 rounded-xl w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <h3 class="text-xl font-bold mb-4 border-b pb-2">ツアー情報の編集/作成</h3>
             <form id="form-tour-editor" onsubmit="event.preventDefault(); submitTour();">
                 <input type="hidden" id="edit-tour-id">
@@ -235,7 +284,7 @@
                         <label class="block font-bold text-sm mb-1">ツアー名</label>
                         <input type="text" id="edit-tour-title" class="w-full border p-2 rounded" required>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block font-bold text-sm mb-1">開催日</label>
                             <input type="date" id="edit-tour-date" class="w-full border p-2 rounded" required>
@@ -245,7 +294,7 @@
                             <input type="date" id="edit-tour-deadline" class="w-full border p-2 rounded" required>
                         </div>
                     </div>
-                    <div class="grid grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label class="block font-bold text-sm mb-1">定員</label>
                             <input type="number" id="edit-tour-capacity" class="w-full border p-2 rounded" required>
@@ -272,7 +321,13 @@
                         <label class="block font-bold text-sm mb-1">画像URL (Imgur)</label>
                         <div class="flex gap-2">
                             <input type="text" id="edit-tour-img" class="w-full border p-2 rounded" placeholder="https://i.imgur.com/...">
-                            <button type="button" class="bg-gray-200 px-4 rounded font-bold text-sm">Upload</button>
+                            <button type="button" class="bg-gray-200 px-4 rounded font-bold text-sm whitespace-nowrap">Upload</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-sm mb-2">利用可能な乗車地（pickupIds）</label>
+                        <div id="edit-tour-pickups" class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-gray-50 rounded border">
+                            <!-- チェックボックスが動的に生成される -->
                         </div>
                     </div>
                 </div>
