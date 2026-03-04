@@ -199,11 +199,17 @@ def format_reservation_message(reservations):
                     pickup_lines.append(f"{prefix}: {loc_name}")
                 pickup_display = "\n".join(pickup_lines)
 
+        # 前席指定
+        preferred_seats = res.get('preferredSeats', [])
+        seat_count = len([s for s in preferred_seats if s])
+        seat_display = f'あり（{seat_count}名分）' if seat_count > 0 else 'なし'
+
         block = f"""📅 日付: {res.get('date', '')}
 🚌 コース名: {res.get('tourTitle', '')}
 👤 代表者: {name}様
 👥 人数: {passengers}名
 💰 料金: ¥{total_price:,}
+💺 前列座席: {seat_display}
 🚏 乗車地: 
 {pickup_display}"""
         blocks.append(block)

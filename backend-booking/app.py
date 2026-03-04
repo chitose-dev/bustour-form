@@ -529,6 +529,10 @@ def create_reservation():
         
         representative_name = (user_info or {}).get('name', '')
 
+        # 前席指定表示を組み立て
+        seat_count = len([s for s in preferred_seats if s])
+        seat_display = f'あり（{seat_count}名分）' if seat_count > 0 else 'なし'
+
         message = f"""下記の通りお申込を承りました。
 
 📅 日付: {date}
@@ -536,6 +540,7 @@ def create_reservation():
 👤 代表者: {representative_name}様
 👥 人数: {passengers}名
 💰 料金: ¥{calculated_total_price:,}
+💺 前列座席: {seat_display}
 🚏 乗車地: 
 {pickup_display}
 

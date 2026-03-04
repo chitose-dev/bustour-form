@@ -54,12 +54,29 @@ def update_reservation_status(reservation_id, new_status=None, progress_status=N
     # トランザクション開始
     @firestore.transactional
     def update_with_inventory(transaction):
-        # トランザクション内で最新の予約データを再読み取り
+        # === 全ての読み取りを先に行う ===
         res_ref = db.collection('reservations').document(reservation_id)
         res_snapshot = res_ref.get(transaction=transaction)
         if not res_snapshot.exists:
             raise ValueError('Reservation not found in transaction')
 
+        tour_ref = None
+        tour_data = None
+        current_count = 0
+
+        if new_status == 'cancelled' and tour_id:
+            tour_ref = db.collection('tours').document(tour_id)
+            tour_snapshot = tour_ref.get(transaction=transaction)
+            if tour_snapshot.exists:
+                tour_data = tour_snapshot.to_dict()
+                # 現在の確定済み予約人数を再計算（キャンセル対象を除外）
+                all_reservations = list(db.collection('reservations').where('tour_id', '==', tour_id).stream())
+                for res in all_reservations:
+                    r_data = res.to_dict()
+                    if res.id != reservation_id and r_data.get('status') == 'confirmed':
+                        current_count += int(r_data.get('passengers', 0) or 0)
+
+        # === 全ての書き込みをまとめて行う ===
         update_payload = {'updatedAt': datetime.now().isoformat()}
         if new_status is not None:
             update_payload['status'] = new_status
@@ -72,32 +89,18 @@ def update_reservation_status(reservation_id, new_status=None, progress_status=N
         transaction.update(res_ref, update_payload)
         
         # キャンセル時の在庫復元
-        if new_status == 'cancelled' and tour_id:
-            tour_ref = db.collection('tours').document(tour_id)
-            tour_snapshot = tour_ref.get(transaction=transaction)
-            if tour_snapshot.exists:
-                tour_data = tour_snapshot.to_dict()
-                capacity = tour_data.get('capacity', 0)
-                current_tour_status = tour_data.get('status')
-                
-                # 現在の確定済み予約人数を再計算（キャンセル対象を除外）
-                all_reservations = db.collection('reservations').where('tour_id', '==', tour_id).stream()
-                current_count = 0
-                for res in all_reservations:
-                    r_data = res.to_dict()
-                    # 自分自身を除外 & confirmed のみカウント
-                    if res.id != reservation_id and r_data.get('status') == 'confirmed':
-                        current_count += int(r_data.get('passengers', 0) or 0)
-                
-                print(f"キャンセル在庫復元: tour={tour_id}, 定員={capacity}, 現在確定人数={current_count}, ツアー状態={current_tour_status}")
-                
-                # 満席だった場合、定員未満なら open に復元
-                if current_tour_status == 'full' and current_count < capacity:
-                    transaction.update(tour_ref, {
-                        'status': 'open',
-                        'updatedAt': datetime.now().isoformat()
-                    })
-                    print(f"ツアー状態を full → open に復元: tour={tour_id}")
+        if new_status == 'cancelled' and tour_id and tour_data:
+            capacity = tour_data.get('capacity', 0)
+            current_tour_status = tour_data.get('status')
+            
+            print(f"キャンセル在庫復元: tour={tour_id}, 定員={capacity}, 現在確定人数={current_count}, ツアー状態={current_tour_status}")
+            
+            if current_tour_status == 'full' and current_count < capacity:
+                transaction.update(tour_ref, {
+                    'status': 'open',
+                    'updatedAt': datetime.now().isoformat()
+                })
+                print(f"ツアー状態を full → open に復元: tour={tour_id}")
     
     transaction = db.transaction()
     update_with_inventory(transaction)
