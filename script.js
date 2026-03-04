@@ -6,8 +6,8 @@
 // ==========================================
 // 設定・定数
 // ==========================================
-const USE_MOCK = true;
-const API_BASE_URL = "https://your-cloud-run-url-here/api/admin";
+const USE_MOCK = false;
+const API_BASE_URL = "https://backend-admin-482800127304.asia-northeast1.run.app/api/admin";
 
 // 状態管理
 let currentAuthToken = null;
