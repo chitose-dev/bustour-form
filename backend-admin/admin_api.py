@@ -178,11 +178,12 @@ def create_tour_api():
         status = data.get('status', 'open')
         description = data.get('description', '')
         image_url = data.get('image_url', '')
+        pickup_ids = data.get('pickupIds', [])
         
         if not all([title, date, deadline_date, capacity, price]):
             return jsonify({'error': 'required fields missing'}), 400
         
-        tour_id = create_tour(title, date, deadline_date, capacity, price, status, description, image_url)
+        tour_id = create_tour(title, date, deadline_date, capacity, price, status, description, image_url, pickup_ids)
         return jsonify({'id': tour_id, 'message': 'Tour created'}), 201
     
     except Exception as e:
@@ -203,7 +204,7 @@ def update_tour_api(tour_id):
         
         # 更新するフィールドのみ抽出
         update_fields = {}
-        for field in ['title', 'date', 'deadline_date', 'capacity', 'price', 'status', 'description', 'image_url']:
+        for field in ['title', 'date', 'deadline_date', 'capacity', 'price', 'status', 'description', 'image_url', 'pickupIds']:
             if field in data:
                 update_fields[field] = data[field]
         
@@ -285,6 +286,18 @@ def update_pickup_api(pickup_id):
         
         return jsonify({'message': 'Pickup updated'}), 200
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@require_auth
+def delete_pickup_api(pickup_id):
+    """
+    DELETE /api/admin/pickups/{id}
+    """
+    try:
+        delete_pickup(pickup_id)
+        return jsonify({'message': 'Pickup deleted'}), 200
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
