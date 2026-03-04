@@ -52,8 +52,8 @@ function normalizeReservation(reservation) {
         name: reservation.name || userInfo.name || '',
         phone: reservation.phone || userInfo.phone || '',
         address: reservation.address || `${userInfo.pref || ''}${userInfo.city || ''}${userInfo.street || ''}`,
-        count: reservation.count ?? reservation.passengers ?? 0,
-        amount: reservation.amount ?? reservation.totalPrice ?? 0,
+        count: Number(reservation.count ?? reservation.passengers ?? 0),
+        amount: Number(reservation.amount ?? reservation.totalPrice ?? 0),
         status: reservation.status || 'confirmed',
         pickup: reservation.pickup || firstPickup,
         seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし')
@@ -165,26 +165,32 @@ async function loadInitialData() {
             { id: 'p4', name: '大宮駅 西口', sortOrder: 4, active: false }
         ];
     } else {
-        const [resTours, resRes, resPick] = await Promise.all([
+        const [resTours, resPick, resConfirmed, resCancelled] = await Promise.all([
             fetch(`${API_BASE_URL}/tours`, { headers: getAuthHeaders() }),
-            fetch(`${API_BASE_URL}/reservations`, { headers: getAuthHeaders() }),
-            fetch(`${API_BASE_URL}/pickups`, { headers: getAuthHeaders() })
+            fetch(`${API_BASE_URL}/pickups`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/reservations?status=confirmed`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/reservations?status=cancelled`, { headers: getAuthHeaders() })
         ]);
 
-        if (!resTours.ok || !resRes.ok || !resPick.ok) {
+        if (!resTours.ok || !resPick.ok || !resConfirmed.ok || !resCancelled.ok) {
             throw new Error('API request failed');
         }
 
         const toursData = await resTours.json();
-        const reservationsData = await resRes.json();
         const pickupsData = await resPick.json();
+        const reservationsConfirmedData = await resConfirmed.json();
+        const reservationsCancelledData = await resCancelled.json();
 
         cachedTours = (Array.isArray(toursData) ? toursData : []).map(normalizeTour);
 
-        const reservationArray = Array.isArray(reservationsData)
-            ? reservationsData
-            : (Array.isArray(reservationsData.reservations) ? reservationsData.reservations : []);
-        cachedReservations = reservationArray.map(normalizeReservation);
+        const reservationArrayConfirmed = Array.isArray(reservationsConfirmedData)
+            ? reservationsConfirmedData
+            : (Array.isArray(reservationsConfirmedData.reservations) ? reservationsConfirmedData.reservations : []);
+        const reservationArrayCancelled = Array.isArray(reservationsCancelledData)
+            ? reservationsCancelledData
+            : (Array.isArray(reservationsCancelledData.reservations) ? reservationsCancelledData.reservations : []);
+
+        cachedReservations = [...reservationArrayConfirmed, ...reservationArrayCancelled].map(normalizeReservation);
 
         cachedPickups = (Array.isArray(pickupsData) ? pickupsData : []).map(normalizePickup);
     }
@@ -351,7 +357,28 @@ async function updateReservationStatus(id, newStatus) {
         alert('ステータスを更新しました');
         loadReservations();
     } else {
-        // PATCH /reservations/{id}
+        try {
+            const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+                method: 'PATCH',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                alert(errorBody.error || 'ステータス更新に失敗しました');
+                return;
+            }
+
+            await loadInitialData();
+            alert('ステータスを更新しました');
+        } catch (err) {
+            console.error(err);
+            alert('通信エラーが発生しました');
+        }
     }
 }
 
@@ -389,7 +416,56 @@ async function submitManualReservation() {
         document.getElementById('form-manual-reservation').reset();
         loadReservations();
     } else {
-        // POST /reservations
+        if (!tour || !tour.date || !tour.title) {
+            alert('ツアー情報の取得に失敗しました。画面を再読み込みしてください。');
+            return;
+        }
+
+        try {
+            const preferredSeats = Array(count).fill(seatPref === 'あり');
+            const pickups = pickup ? Array(count).fill(pickup) : [];
+
+            const payload = {
+                tour_id: tourId,
+                date: tour.date,
+                tour_title: tour.title,
+                passengers: count,
+                user_info: {
+                    name: name,
+                    phone: phone,
+                    pref: '',
+                    city: '',
+                    street: address
+                },
+                pickups: pickups,
+                preferred_seats: preferredSeats,
+                total_price: price
+            };
+
+            const res = await fetch(`${API_BASE_URL}/reservations`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                alert(errorBody.error || '手動予約の登録に失敗しました');
+                return;
+            }
+
+            closeModal('modal-add-reservation');
+            document.getElementById('form-manual-reservation').reset();
+            await loadInitialData();
+            switchTab('reservations');
+            alert('予約を追加しました');
+        } catch (err) {
+            console.error(err);
+            alert('通信エラーが発生しました');
+        }
     }
 }
 
@@ -465,7 +541,7 @@ function editTour(id) {
     openModal('modal-tour-editor');
 }
 
-function submitTour() {
+async function submitTour() {
     const id = document.getElementById('edit-tour-id').value;
     const title = document.getElementById('edit-tour-title').value;
     const date = document.getElementById('edit-tour-date').value;
@@ -501,11 +577,52 @@ function submitTour() {
         document.getElementById('edit-tour-id').value = '';
         loadTours();
     } else {
-        // PUT or POST /tours
+        try {
+            const payload = {
+                title: title,
+                date: date,
+                deadline_date: deadline,
+                capacity: capacity,
+                price: price,
+                status: status,
+                description: description,
+                image_url: imageUrl,
+                pickupIds: pickupIds
+            };
+
+            const isEdit = !!id;
+            const res = await fetch(
+                isEdit ? `${API_BASE_URL}/tours/${id}` : `${API_BASE_URL}/tours`,
+                {
+                    method: isEdit ? 'PATCH' : 'POST',
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                alert(errorBody.error || 'ツアー保存に失敗しました');
+                return;
+            }
+
+            closeModal('modal-tour-editor');
+            document.getElementById('form-tour-editor').reset();
+            document.getElementById('edit-tour-id').value = '';
+            await loadInitialData();
+            switchTab('tours');
+            alert(isEdit ? 'ツアー情報を更新しました' : '新規ツアーを作成しました');
+        } catch (err) {
+            console.error(err);
+            alert('通信エラーが発生しました');
+        }
     }
 }
 
-function deleteTour(id) {
+async function deleteTour(id) {
     const t = cachedTours.find(function(x) { return x.id === id; });
     if (!t) return;
     
@@ -515,6 +632,26 @@ function deleteTour(id) {
         cachedTours = cachedTours.filter(function(x) { return x.id !== id; });
         alert('ツアーを削除しました');
         loadTours();
+    } else {
+        try {
+            const res = await fetch(`${API_BASE_URL}/tours/${id}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                alert(errorBody.error || 'ツアー削除に失敗しました');
+                return;
+            }
+
+            await loadInitialData();
+            switchTab('tours');
+            alert('ツアーを削除しました');
+        } catch (err) {
+            console.error(err);
+            alert('通信エラーが発生しました');
+        }
     }
 }
 
@@ -541,16 +678,41 @@ function loadPickups() {
     });
 }
 
-function togglePickupActive(id) {
+async function togglePickupActive(id) {
     const p = cachedPickups.find(function(x) { return x.id === id; });
     if (!p) return;
     p.active = !p.active;
     if (USE_MOCK) {
         loadPickups();
+    } else {
+        try {
+            const res = await fetch(`${API_BASE_URL}/pickups/${id}`, {
+                method: 'PATCH',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ isActive: p.active })
+            });
+
+            if (!res.ok) {
+                p.active = !p.active;
+                const errorBody = await res.json().catch(() => ({}));
+                alert(errorBody.error || '乗車地状態の更新に失敗しました');
+                return;
+            }
+
+            await loadInitialData();
+            switchTab('pickups');
+        } catch (err) {
+            p.active = !p.active;
+            console.error(err);
+            alert('通信エラーが発生しました');
+        }
     }
 }
 
-function addPickup() {
+async function addPickup() {
     const name = document.getElementById('new-pickup-name').value.trim();
     const sortInput = document.getElementById('new-pickup-sort');
     const sortOrder = sortInput ? parseInt(sortInput.value) || (cachedPickups.length + 1) : (cachedPickups.length + 1);
@@ -560,18 +722,71 @@ function addPickup() {
         return;
     }
     
-    cachedPickups.push({ id: 'p_new_' + Date.now(), name: name, sortOrder: sortOrder, active: true });
-    document.getElementById('new-pickup-name').value = '';
-    if (sortInput) sortInput.value = '';
-    loadPickups();
+    if (USE_MOCK) {
+        cachedPickups.push({ id: 'p_new_' + Date.now(), name: name, sortOrder: sortOrder, active: true });
+        document.getElementById('new-pickup-name').value = '';
+        if (sortInput) sortInput.value = '';
+        loadPickups();
+    } else {
+        try {
+            const res = await fetch(`${API_BASE_URL}/pickups`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    isActive: true,
+                    sortOrder: sortOrder
+                })
+            });
+
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                alert(errorBody.error || '乗車地追加に失敗しました');
+                return;
+            }
+
+            document.getElementById('new-pickup-name').value = '';
+            if (sortInput) sortInput.value = '';
+            await loadInitialData();
+            switchTab('pickups');
+        } catch (err) {
+            console.error(err);
+            alert('通信エラーが発生しました');
+        }
+    }
 }
 
-function deletePickup(id) {
+async function deletePickup(id) {
     const p = cachedPickups.find(function(x) { return x.id === id; });
     if (!p) return;
     
     if (!confirm('「' + p.name + '」を削除してもよろしいですか？')) return;
     
-    cachedPickups = cachedPickups.filter(function(x) { return x.id !== id; });
-    loadPickups();
+    if (USE_MOCK) {
+        cachedPickups = cachedPickups.filter(function(x) { return x.id !== id; });
+        loadPickups();
+    } else {
+        try {
+            const res = await fetch(`${API_BASE_URL}/pickups/${id}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                alert(errorBody.error || '乗車地削除に失敗しました');
+                return;
+            }
+
+            await loadInitialData();
+            switchTab('pickups');
+            alert('乗車地を削除しました');
+        } catch (err) {
+            console.error(err);
+            alert('通信エラーが発生しました');
+        }
+    }
 }
