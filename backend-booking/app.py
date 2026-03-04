@@ -72,9 +72,7 @@ def get_calendar():
     ?month=YYYY-MM
     返却: {YYYY-MM-DD: {available: bool, reason: str}}
     """
-    month = request.args.get('month')
-    if not month:
-        return jsonify({'error': 'month parameter required'}), 400
+    month = request.args.get('month') or datetime.now().strftime('%Y-%m')
     
     try:
         today = datetime.now().date()
@@ -228,15 +226,18 @@ def get_pickups():
     返却: [{id, name, sortOrder}]
     """
     try:
-        pickups_ref = db.collection('pickups').where('isActive', '==', True).order_by('sortOrder')
+        pickups_ref = db.collection('pickups')
         pickups = []
         for doc in pickups_ref.stream():
             pickup_data = doc.to_dict()
+            if not pickup_data.get('isActive', True):
+                continue
             pickups.append({
                 'id': doc.id,
                 'name': pickup_data.get('name'),
                 'sortOrder': pickup_data.get('sortOrder', 0)
             })
+        pickups.sort(key=lambda item: item.get('sortOrder', 0))
         return jsonify(pickups), 200
     
     except Exception as e:

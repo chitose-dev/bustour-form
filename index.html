@@ -286,16 +286,20 @@
             document.getElementById('screen-b01').classList.add('active');
             
             try {
-                const liffId = "YOUR_LIFF_ID";
-                await liff.init({ liffId });
-                
-                if (liff.isLoggedIn()) {
-                    const profile = await liff.getProfile();
-                    cache.lineUserId = profile.userId;
-                    console.log("LIFF initialized:", cache.lineUserId);
-                    await loadUserProfile();
+                if (typeof window.liff !== 'undefined') {
+                    const liffId = "YOUR_LIFF_ID";
+                    await liff.init({ liffId });
+
+                    if (liff.isLoggedIn()) {
+                        const profile = await liff.getProfile();
+                        cache.lineUserId = profile.userId;
+                        console.log("LIFF initialized:", cache.lineUserId);
+                        await loadUserProfile();
+                    } else {
+                        liff.login();
+                    }
                 } else {
-                    liff.login();
+                    console.warn("LIFF SDK is not loaded. Continuing without LIFF.");
                 }
             } catch (err) {
                 console.error("LIFF init error:", err);
@@ -309,7 +313,8 @@
 
         async function loadCalendarData(month) {
             try {
-                const response = await fetch(`${BOOKING_API_BASE}/calendar?month=${month}`);
+                const targetMonth = month || getCurrentMonthString();
+                const response = await fetch(`${BOOKING_API_BASE}/calendar?month=${encodeURIComponent(targetMonth)}`);
                 if (response.ok) {
                     const data = await response.json();
                     calendarData = {};
