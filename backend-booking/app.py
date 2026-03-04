@@ -514,14 +514,45 @@ def create_reservation():
         reservation_id, calculated_total_price = transfer(transaction)
         
         # 10. LINE通知（lineUserId がある通常予約のみ）
-        message = f"""予約を受け付けました
+        # 乗車地表示を組み立て
+        pickup_display = ''
+        if pickups:
+            if len(pickups) == 1:
+                pickup_display = pickups[0] if isinstance(pickups[0], str) else pickups[0].get('name', '')
+            else:
+                pickup_lines = []
+                for i, p in enumerate(pickups):
+                    loc_name = p if isinstance(p, str) else p.get('name', '')
+                    prefix = '代表者' if i == 0 else f'{i+1}人目'
+                    pickup_lines.append(f"{prefix}: {loc_name}")
+                pickup_display = "\n".join(pickup_lines)
+        
+        representative_name = (user_info or {}).get('name', '')
 
-ツアー名：{tour_title}
-日付：{date}
-人数：{passengers}名
-金額：¥{calculated_total_price:,}
+        message = f"""下記の通りお申込を承りました。
 
-キャンセルの際は公式LINEからご連絡ください"""
+📅 日付: {date}
+🚌 コース名: {tour_title}
+👤 代表者: {representative_name}様
+👥 人数: {passengers}名
+💰 料金: ¥{calculated_total_price:,}
+🚏 乗車地: 
+{pickup_display}
+
+📝 お申込み状況: 申込受付中
+
+お問い合わせありがとうございます。
+正式なご予約は、弊社からのご連絡をもって確定となります。
+担当者からのご連絡をお待ちください。
+
+2営業日（土日祝定休）を経過しても連絡がない場合は、お申込が届いていない可能性がございます。
+その際はお手数ですがご一報ください。
+
+乗車地【木之本・米原・彦根】は、他のお客様を含めて5名以上の申込みがない場合、乗車地の変更をお願いする場合がございます。
+
+【よくある質問】
+・時間は何時ですか？←旅行日より１～２週間前に旅程表をお送りいたしますのでお待ち下さい
+・お支払いはどうしたら良いですか？←当日現金またはPayPayで頂戴しております"""
 
         if line_user_id:
             send_line_notification(line_user_id, message)
