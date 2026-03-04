@@ -84,7 +84,7 @@
                         <label class="block text-sm font-bold mb-1 text-gray-600">郵便番号</label>
                         <div class="flex gap-2">
                             <input type="text" id="input-zip" class="w-1/2 border-2 border-gray-300 p-3 rounded-lg bg-white">
-                            <button type="button" class="w-1/2 bg-gray-200 text-black font-bold rounded-lg border-2 border-gray-300 text-sm">住所検索</button>
+                            <button type="button" id="btn-zip-search" onclick="searchAddressByZip()" class="w-1/2 bg-gray-200 text-black font-bold rounded-lg border-2 border-gray-300 text-sm">住所検索</button>
                         </div>
                     </div>
                     <div class="mb-4">
@@ -260,6 +260,14 @@
         let calendarData = {};
         let toursData = {};
 
+        function getDefaultPickups() {
+            return [
+                { id: "pickup-001", name: "新宿駅 西口", sortOrder: 1 },
+                { id: "pickup-002", name: "東京駅 丸の内北口", sortOrder: 2 },
+                { id: "pickup-003", name: "横浜駅 東口", sortOrder: 3 }
+            ];
+        }
+
         function getCurrentMonthString() {
             return `${currentCalendarYear}-${String(currentCalendarMonth + 1).padStart(2, '0')}`;
         }
@@ -366,15 +374,52 @@
                         name: p.name,
                         sortOrder: p.sortOrder || 0
                     }));
+                } else {
+                    console.error("Failed to load pickups:", response.status);
+                    PICKUP_OPTIONS = getDefaultPickups();
                 }
             } catch (err) {
                 console.error("Failed to load pickups:", err);
-                // デフォルト値（sortOrder付き）
-                PICKUP_OPTIONS = [
-                    { id: "pickup-001", name: "新宿駅 西口", sortOrder: 1 },
-                    { id: "pickup-002", name: "東京駅 丸の内北口", sortOrder: 2 },
-                    { id: "pickup-003", name: "横浜駅 東口", sortOrder: 3 }
-                ];
+                PICKUP_OPTIONS = getDefaultPickups();
+            }
+        }
+
+        async function searchAddressByZip() {
+            const zipInput = document.getElementById('input-zip');
+            const button = document.getElementById('btn-zip-search');
+            const zip = (zipInput.value || '').replace(/[^0-9]/g, '');
+
+            if (zip.length !== 7) {
+                alert('郵便番号は7桁で入力してください');
+                return;
+            }
+
+            try {
+                button.disabled = true;
+                button.innerText = '検索中...';
+
+                const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`);
+                if (!response.ok) {
+                    alert('住所検索に失敗しました');
+                    return;
+                }
+
+                const data = await response.json();
+                if (!data || !data.results || data.results.length === 0) {
+                    alert('該当する住所が見つかりませんでした');
+                    return;
+                }
+
+                const result = data.results[0];
+                document.getElementById('input-pref').value = result.address1 || '';
+                document.getElementById('input-city').value = `${result.address2 || ''}${result.address3 || ''}`;
+                document.getElementById('input-street').focus();
+            } catch (err) {
+                console.error('Zip search failed:', err);
+                alert('住所検索に失敗しました');
+            } finally {
+                button.disabled = false;
+                button.innerText = '住所検索';
             }
         }
 
