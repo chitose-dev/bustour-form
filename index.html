@@ -303,8 +303,7 @@
                     await liff.init({ liffId });
 
                     if (liff.isLoggedIn()) {
-                        const profile = await liff.getProfile();
-                        cache.lineUserId = profile.userId;
+                        cache.lineUserId = await resolveLineUserId();
                         console.log("LIFF initialized:", cache.lineUserId);
                         await loadUserProfile();
                     } else {
@@ -322,6 +321,28 @@
                 loadPickupOptions()
             ]);
         });
+
+        async function resolveLineUserId() {
+            try {
+                const profile = await liff.getProfile();
+                if (profile && profile.userId) {
+                    return profile.userId;
+                }
+            } catch (err) {
+                console.warn('getProfile failed, fallback to ID token:', err);
+            }
+
+            try {
+                const decoded = liff.getDecodedIDToken();
+                if (decoded && decoded.sub) {
+                    return decoded.sub;
+                }
+            } catch (err) {
+                console.warn('getDecodedIDToken failed:', err);
+            }
+
+            return null;
+        }
 
         async function loadCalendarData(month) {
             try {
@@ -920,8 +941,7 @@
                     return false;
                 }
 
-                const profile = await liff.getProfile();
-                cache.lineUserId = profile?.userId || null;
+                cache.lineUserId = await resolveLineUserId();
                 return !!cache.lineUserId;
             } catch (err) {
                 console.error('Failed to ensure lineUserId:', err);
