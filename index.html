@@ -301,12 +301,17 @@
                 if (typeof window.liff !== 'undefined') {
                     const liffId = "2009323831-cfxQtdaY";
                     await liff.init({ liffId });
+                    console.log("LIFF init OK. isLoggedIn:", liff.isLoggedIn(), "isInClient:", liff.isInClient(), "OS:", liff.getOS());
 
                     if (liff.isLoggedIn()) {
                         cache.lineUserId = await resolveLineUserId();
                         console.log("LIFF initialized:", cache.lineUserId);
+                        if (!cache.lineUserId) {
+                            console.warn("LIFF logged in but no userId obtained. Debug:", window._liffDebug);
+                        }
                         await loadUserProfile();
                     } else {
+                        console.log("Not logged in, redirecting to login...");
                         liff.login();
                     }
                 } else {
@@ -323,24 +328,57 @@
         });
 
         async function resolveLineUserId() {
+            const debugInfo = [];
+
+            // 1) liff.getContext() — スコープ不要
+            try {
+                const ctx = liff.getContext();
+                debugInfo.push('context: ' + JSON.stringify(ctx));
+                if (ctx && ctx.userId) {
+                    console.log('Got userId from getContext');
+                    return ctx.userId;
+                }
+            } catch (err) {
+                debugInfo.push('context err: ' + err.message);
+            }
+
+            // 2) liff.getProfile() — profile スコープ必要
             try {
                 const profile = await liff.getProfile();
+                debugInfo.push('profile: ' + JSON.stringify({userId: profile?.userId, displayName: profile?.displayName}));
                 if (profile && profile.userId) {
                     return profile.userId;
                 }
             } catch (err) {
-                console.warn('getProfile failed, fallback to ID token:', err);
+                debugInfo.push('profile err: ' + err.message);
             }
 
+            // 3) liff.getDecodedIDToken() — openid スコープ必要
             try {
                 const decoded = liff.getDecodedIDToken();
+                debugInfo.push('idToken: ' + JSON.stringify({sub: decoded?.sub}));
                 if (decoded && decoded.sub) {
                     return decoded.sub;
                 }
             } catch (err) {
-                console.warn('getDecodedIDToken failed:', err);
+                debugInfo.push('idToken err: ' + err.message);
             }
 
+            // 4) liff.getIDToken() を手動デコード
+            try {
+                const raw = liff.getIDToken();
+                if (raw) {
+                    const payload = JSON.parse(atob(raw.split('.')[1]));
+                    debugInfo.push('rawToken sub: ' + payload.sub);
+                    if (payload.sub) return payload.sub;
+                }
+            } catch (err) {
+                debugInfo.push('rawToken err: ' + err.message);
+            }
+
+            // 全て失敗 → デバッグ情報をコンソール＆画面表示
+            console.error('resolveLineUserId all methods failed:', debugInfo);
+            window._liffDebug = debugInfo;
             return null;
         }
 
@@ -963,7 +1001,8 @@
             try {
                 const hasLineUserId = await ensureLineUserId();
                 if (!hasLineUserId) {
-                    alert("LINEユーザー情報を取得できませんでした。LINEアプリ内で開き直して再度お試しください。");
+                    const dbg = window._liffDebug ? '\n\n[Debug]\n' + window._liffDebug.join('\n') : '';
+                    alert("LINEユーザー情報を取得できませんでした。LINEアプリ内で開き直して再度お試しください。" + dbg);
                     return;
                 }
 
