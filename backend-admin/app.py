@@ -1,5 +1,6 @@
 import os
-from flask import Flask
+import json
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from admin_api import (
     login, get_reservations_api, update_reservation_api, create_reservation_api,
@@ -7,6 +8,7 @@ from admin_api import (
     get_pickups_api, create_pickup_api, update_pickup_api, delete_pickup_api,
     upload_image_api
 )
+from line_api import verify_webhook_signature, handle_webhook_event
 
 app = Flask(__name__)
 CORS(app)
@@ -77,6 +79,30 @@ def delete_pickup_route(pickup_id):
 @app.route('/api/admin/images/upload', methods=['POST'])
 def upload_image_route():
     return upload_image_api()
+
+# ---------------------------------
+# LINE Webhookエンドポイント
+# ---------------------------------
+@app.route('/webhook', methods=['POST'])
+def line_webhook():
+    """LINE Messaging API Webhookハンドラー"""
+    body = request.get_data()
+    signature = request.headers.get('X-Line-Signature', '')
+
+    # 署名検証
+    if not verify_webhook_signature(body, signature):
+        print('Webhook署名検証失敗')
+        return jsonify({'error': 'Invalid signature'}), 403
+
+    try:
+        body_json = json.loads(body)
+        events = body_json.get('events', [])
+        for event in events:
+            handle_webhook_event(event)
+    except Exception as e:
+        print(f'Webhookイベント処理エラー: {e}')
+
+    return jsonify({'status': 'ok'}), 200
 
 # ---------------------------------
 # ヘルスチェック
