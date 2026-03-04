@@ -910,6 +910,25 @@
             container.appendChild(screen);
         }
 
+        async function ensureLineUserId() {
+            if (cache.lineUserId) return true;
+
+            try {
+                if (typeof window.liff === 'undefined') return false;
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return false;
+                }
+
+                const profile = await liff.getProfile();
+                cache.lineUserId = profile?.userId || null;
+                return !!cache.lineUserId;
+            } catch (err) {
+                console.error('Failed to ensure lineUserId:', err);
+                return false;
+            }
+        }
+
         async function submitReservation() {
             if (cache.isSubmitting) {
                 alert("送信中です。お待ちください...");
@@ -922,6 +941,12 @@
             btn.innerText = "読み込み中…";
 
             try {
+                const hasLineUserId = await ensureLineUserId();
+                if (!hasLineUserId) {
+                    alert("LINEユーザー情報を取得できませんでした。LINEアプリ内で開き直して再度お試しください。");
+                    return;
+                }
+
                 const payload = {
                     lineUserId: cache.lineUserId,
                     date: cache.date,
