@@ -4,7 +4,8 @@ from auth import require_auth, generate_token, validate_password
 from db import (
     get_reservations_with_filters, get_reservation, update_reservation_status, create_manual_reservation,
     get_tours, get_tour, create_tour, update_tour, delete_tour,
-    get_pickups, create_pickup, update_pickup, delete_pickup
+    get_pickups, create_pickup, update_pickup, delete_pickup,
+    cleanup_old_cancelled_reservations
 )
 from pricing import calculate_total_price, aggregate_reservations
 from line_api import send_cancellation_notification
@@ -44,6 +45,12 @@ def get_reservations_api():
     GET /api/admin/reservations?tour_name=...&date_from=...&date_to=...&status=...
     """
     try:
+        # キャンセルから3ヶ月経過した予約を自動で物理削除
+        try:
+            cleanup_old_cancelled_reservations(months=3)
+        except Exception as cleanup_err:
+            print(f"クリーンアップ警告（継続）: {cleanup_err}")
+
         tour_name = request.args.get('tour_name')
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')

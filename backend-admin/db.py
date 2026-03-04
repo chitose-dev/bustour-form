@@ -1,5 +1,5 @@
 from google.cloud import firestore
-from datetime import datetime
+from datetime import datetime, timedelta
 
 db = firestore.Client()
 
@@ -42,7 +42,7 @@ def get_reservation(reservation_id):
     return data
 
 def update_reservation_status(reservation_id, new_status=None, progress_status=None, remark=None):
-    """予約更新（status / progressStatus / remark）"""
+    """予約更新（status / progressStatus / remark）- キャンセル時は在庫を確実に復元"""
     res_doc = db.collection('reservations').document(reservation_id).get()
     if not res_doc.exists:
         return False
@@ -54,6 +54,12 @@ def update_reservation_status(reservation_id, new_status=None, progress_status=N
     # トランザクション開始
     @firestore.transactional
     def update_with_inventory(transaction):
+        # トランザクション内で最新の予約データを再読み取り
+        res_ref = db.collection('reservations').document(reservation_id)
+        res_snapshot = res_ref.get(transaction=transaction)
+        if not res_snapshot.exists:
+            raise ValueError('Reservation not found in transaction')
+
         update_payload = {'updatedAt': datetime.now().isoformat()}
         if new_status is not None:
             update_payload['status'] = new_status
@@ -63,32 +69,35 @@ def update_reservation_status(reservation_id, new_status=None, progress_status=N
         if remark is not None:
             update_payload['remark'] = remark
 
-        transaction.update(
-            db.collection('reservations').document(reservation_id),
-            update_payload
-        )
+        transaction.update(res_ref, update_payload)
         
         # キャンセル時の在庫復元
         if new_status == 'cancelled' and tour_id:
-            tour_doc = db.collection('tours').document(tour_id).get()
-            if tour_doc.exists:
-                tour_data = tour_doc.to_dict()
+            tour_ref = db.collection('tours').document(tour_id)
+            tour_snapshot = tour_ref.get(transaction=transaction)
+            if tour_snapshot.exists:
+                tour_data = tour_snapshot.to_dict()
                 capacity = tour_data.get('capacity', 0)
-                status = tour_data.get('status')
+                current_tour_status = tour_data.get('status')
                 
-                # 現在の予約人数（キャンセル対象を除外）
-                reservations_ref = db.collection('reservations').where('tour_id', '==', tour_id).where('status', '==', 'confirmed')
+                # 現在の確定済み予約人数を再計算（キャンセル対象を除外）
+                all_reservations = db.collection('reservations').where('tour_id', '==', tour_id).stream()
                 current_count = 0
-                for res in reservations_ref.stream():
-                    if res.id != reservation_id:  # 自分自身を除外
-                        current_count += res.to_dict().get('passengers', 0)
+                for res in all_reservations:
+                    r_data = res.to_dict()
+                    # 自分自身を除外 & confirmed のみカウント
+                    if res.id != reservation_id and r_data.get('status') == 'confirmed':
+                        current_count += int(r_data.get('passengers', 0) or 0)
                 
-                # 定員未満になった場合、full → open に復元
-                if status == 'full' and current_count < capacity:
-                    transaction.update(
-                        db.collection('tours').document(tour_id),
-                        {'status': 'open', 'updatedAt': datetime.now().isoformat()}
-                    )
+                print(f"キャンセル在庫復元: tour={tour_id}, 定員={capacity}, 現在確定人数={current_count}, ツアー状態={current_tour_status}")
+                
+                # 満席だった場合、定員未満なら open に復元
+                if current_tour_status == 'full' and current_count < capacity:
+                    transaction.update(tour_ref, {
+                        'status': 'open',
+                        'updatedAt': datetime.now().isoformat()
+                    })
+                    print(f"ツアー状態を full → open に復元: tour={tour_id}")
     
     transaction = db.transaction()
     update_with_inventory(transaction)
@@ -221,3 +230,48 @@ def delete_pickup(pickup_id):
     """乗車地削除"""
     db.collection('pickups').document(pickup_id).delete()
     return True
+
+
+def cleanup_old_cancelled_reservations(months=3):
+    """キャンセルから指定月数経過した予約を物理削除（キャンセルのみ対象）"""
+    cutoff_date = datetime.now() - timedelta(days=months * 30)
+    cutoff_str = cutoff_date.isoformat()
+    
+    deleted_count = 0
+    try:
+        # キャンセル済み予約を全件取得
+        cancelled_docs = db.collection('reservations').where('status', '==', 'cancelled').stream()
+        
+        batch = db.batch()
+        batch_count = 0
+        
+        for doc in cancelled_docs:
+            data = doc.to_dict()
+            cancelled_at = data.get('cancelledAt') or data.get('updatedAt') or data.get('createdAt', '')
+            
+            if not cancelled_at:
+                continue
+            
+            # cancelledAt が cutoff より古ければ削除対象
+            if cancelled_at < cutoff_str:
+                batch.delete(doc.reference)
+                batch_count += 1
+                deleted_count += 1
+                
+                # Firestoreのバッチは最大500件
+                if batch_count >= 500:
+                    batch.commit()
+                    batch = db.batch()
+                    batch_count = 0
+        
+        if batch_count > 0:
+            batch.commit()
+        
+        if deleted_count > 0:
+            print(f"古いキャンセル予約を物理削除: {deleted_count}件（{months}ヶ月以上経過）")
+        
+        return deleted_count
+    
+    except Exception as e:
+        print(f"キャンセル予約クリーンアップエラー: {e}")
+        return 0
