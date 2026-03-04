@@ -112,7 +112,9 @@
                             <label class="block text-sm font-bold text-gray-600 mb-1">ステータス</label>
                             <select id="filter-status" class="w-full border p-2 rounded" onchange="loadReservations()">
                                 <option value="all">全て</option>
-                                <option value="confirmed">確定 (confirmed)</option>
+                                <option value="shipping">発送</option>
+                                <option value="middle">中間</option>
+                                <option value="final">最終</option>
                                 <option value="cancelled">キャンセル (cancelled)</option>
                             </select>
                         </div>
@@ -142,7 +144,7 @@
                     <table class="w-full text-left border-collapse min-w-[800px]">
                         <thead class="bg-gray-100 border-b-2 border-gray-300">
                             <tr>
-                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ID</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">LINE ID</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ツアー日</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ツアー名</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">氏名</th>
@@ -151,6 +153,7 @@
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">前列</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">金額</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">状態</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">備考</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">操作</th>
                             </tr>
                         </thead>
@@ -252,6 +255,10 @@
                             <option value="なし">なし</option>
                             <option value="あり">あり（全員分）</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-sm mb-1">備考</label>
+                        <textarea id="manual-remark" class="w-full border p-2 rounded" rows="2" placeholder="備考を入力"></textarea>
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">

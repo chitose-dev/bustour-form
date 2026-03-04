@@ -71,16 +71,23 @@ def get_reservations_api():
 def update_reservation_api(reservation_id):
     """
     PATCH /api/admin/reservations/{id}
-    {status}
+    {status, progressStatus, remark}
     """
     try:
         data = request.get_json()
         new_status = data.get('status')
-        
-        if not new_status:
-            return jsonify({'error': 'status required'}), 400
-        
-        success = update_reservation_status(reservation_id, new_status)
+        progress_status = data.get('progressStatus')
+        remark = data.get('remark')
+
+        if new_status is None and progress_status is None and remark is None:
+            return jsonify({'error': 'status or progressStatus or remark required'}), 400
+
+        success = update_reservation_status(
+            reservation_id,
+            new_status=new_status,
+            progress_status=progress_status,
+            remark=remark
+        )
         if not success:
             return jsonify({'error': 'reservation not found'}), 404
         
@@ -103,7 +110,7 @@ def update_reservation_api(reservation_id):
 def create_reservation_api():
     """
     POST /api/admin/reservations
-    {tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price}
+    {tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark}
     """
     try:
         data = request.get_json()
@@ -116,6 +123,7 @@ def create_reservation_api():
         pickups = data.get('pickups', [])
         preferred_seats = data.get('preferred_seats', [])
         total_price = data.get('total_price', 0)
+        remark = data.get('remark', '')
         
         # 入力値チェック
         if not all([tour_id, date, tour_title]):
@@ -135,7 +143,7 @@ def create_reservation_api():
         
         # 手入力予約作成（LINE通知なし）
         reservation_id = create_manual_reservation(
-            tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price
+            tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark
         )
         
         return jsonify({'id': reservation_id, 'message': 'Reservation created'}), 201

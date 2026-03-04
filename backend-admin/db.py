@@ -41,8 +41,8 @@ def get_reservation(reservation_id):
     data['id'] = doc.id
     return data
 
-def update_reservation_status(reservation_id, new_status):
-    """予約ステータス更新"""
+def update_reservation_status(reservation_id, new_status=None, progress_status=None, remark=None):
+    """予約更新（status / progressStatus / remark）"""
     res_doc = db.collection('reservations').document(reservation_id).get()
     if not res_doc.exists:
         return False
@@ -54,14 +54,18 @@ def update_reservation_status(reservation_id, new_status):
     # トランザクション開始
     @firestore.transactional
     def update_with_inventory(transaction):
-        # 予約ステータス更新
+        update_payload = {'updatedAt': datetime.now().isoformat()}
+        if new_status is not None:
+            update_payload['status'] = new_status
+            update_payload['cancelledAt'] = datetime.now().isoformat() if new_status == 'cancelled' else None
+        if progress_status is not None:
+            update_payload['progressStatus'] = progress_status
+        if remark is not None:
+            update_payload['remark'] = remark
+
         transaction.update(
             db.collection('reservations').document(reservation_id),
-            {
-                'status': new_status,
-                'updatedAt': datetime.now().isoformat(),
-                'cancelledAt': datetime.now().isoformat() if new_status == 'cancelled' else None
-            }
+            update_payload
         )
         
         # キャンセル時の在庫復元
@@ -90,7 +94,7 @@ def update_reservation_status(reservation_id, new_status):
     update_with_inventory(transaction)
     return True
 
-def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price):
+def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark=''):
     """手入力予約作成（LINE通知なし）"""
     reservation = {
         'lineUserId': None,
@@ -103,6 +107,8 @@ def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, 
         'preferredSeats': preferred_seats,
         'totalPrice': total_price,
         'status': 'confirmed',
+        'progressStatus': 'shipping',
+        'remark': remark,
         'isManualEntry': True,
         'createdAt': datetime.now().isoformat()
     }

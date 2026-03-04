@@ -1,6 +1,9 @@
 import os
 import json
 from datetime import datetime
+from datetime import timedelta
+import smtplib
+from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from google.cloud import firestore
@@ -17,6 +20,12 @@ db = firestore.Client()
 PREFERRED_SEAT_PRICE = 500
 LINE_CHANNEL_TOKEN = os.getenv('LINE_CHANNEL_TOKEN', 'YOUR_LINE_CHANNEL_TOKEN')
 LINE_MESSAGING_API = 'https://api.line.me/v2/bot/message/push'
+SMTP_HOST = os.getenv('SMTP_HOST', '')
+SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+SMTP_USER = os.getenv('SMTP_USER', '')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
+SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER)
+SMTP_USE_TLS = os.getenv('SMTP_USE_TLS', 'true').lower() == 'true'
 
 # ---------------------------------
 # ユーティリティ
@@ -35,6 +44,19 @@ def parse_date(date_str):
 def get_month_string(date_str):
     """YYYY-MM-DD から YYYY-MM を抽出"""
     return date_str[:7]
+
+def get_tour_range_dates(start_date_str, end_date_str):
+    """ツアー期間の開始日・終了日を返す（終了日が開始日より前なら開始日に揃える）"""
+    start_date = parse_date(start_date_str)
+    end_date = parse_date(end_date_str) if end_date_str else None
+
+    if not start_date:
+        return None, None
+
+    if not end_date or end_date < start_date:
+        end_date = start_date
+
+    return start_date.date(), end_date.date()
 
 # ---------------------------------
 # LINE通知（スタブ）
@@ -61,6 +83,33 @@ def send_line_notification(user_id, message):
         print(f"LINE通知エラー: {e}")
         return False
 
+
+def send_reservation_email(to_email, subject, body):
+    """SMTPで予約完了メールを送信"""
+    if not to_email:
+        return False
+    if not SMTP_HOST or not SMTP_FROM:
+        print("メール送信スキップ: SMTP設定不足")
+        return False
+
+    try:
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = SMTP_FROM
+        msg['To'] = to_email
+        msg.set_content(body)
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as smtp:
+            if SMTP_USE_TLS:
+                smtp.starttls()
+            if SMTP_USER and SMTP_PASSWORD:
+                smtp.login(SMTP_USER, SMTP_PASSWORD)
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"メール送信エラー: {e}")
+        return False
+
 # ---------------------------------
 # 予約API（backend-booking）
 # ---------------------------------
@@ -77,19 +126,39 @@ def get_calendar():
     try:
         today = datetime.now().date()
         
-        # その月のツアー一覧を取得
-        tours_ref = db.collection('tours').where('date', '>=', f"{month}-01").where('date', '<', f"{month}-32")
+        # ツアー一覧を取得（期間ツアー対応のため全件から判定）
+        tours_ref = db.collection('tours')
         tours_docs = tours_ref.stream()
         
         # 日付ごとのツアー情報を集計
         tour_by_date = {}
+        month_start = parse_date(f"{month}-01")
+        if not month_start:
+            return jsonify({'error': 'invalid month format'}), 400
+        month_start = month_start.date()
+        month_end = parse_date(f"{month}-31").date()
+
         for tour_doc in tours_docs:
             tour_data = tour_doc.to_dict()
-            date = tour_data.get('date')
-            if date:
-                if date not in tour_by_date:
-                    tour_by_date[date] = []
-                tour_by_date[date].append(tour_data)
+            start_str = tour_data.get('date')
+            end_str = tour_data.get('deadline_date')
+            start_date, end_date = get_tour_range_dates(start_str, end_str)
+
+            if not start_date or not end_date:
+                continue
+
+            # 対象月と重なるツアーだけ展開
+            if end_date < month_start or start_date > month_end:
+                continue
+
+            cursor = max(start_date, month_start)
+            cursor_end = min(end_date, month_end)
+            while cursor <= cursor_end:
+                date_key = cursor.strftime('%Y-%m-%d')
+                if date_key not in tour_by_date:
+                    tour_by_date[date_key] = []
+                tour_by_date[date_key].append(tour_data)
+                cursor += timedelta(days=1)
         
         # カレンダー用の結果を生成
         result = {}
@@ -109,6 +178,10 @@ def get_calendar():
                 available = False
                 reason = 'no_tour'
             else:
+                if date_str < today.strftime('%Y-%m-%d'):
+                    available = False
+                    reason = 'deadline_passed'
+
                 # ツアーが存在する場合、状態を確認
                 has_open = False
                 for tour in tour_by_date[date_str]:
@@ -162,13 +235,28 @@ def get_tours():
         return jsonify({'error': 'date parameter required'}), 400
     
     try:
-        tours_ref = db.collection('tours').where('date', '==', date).where('status', 'in', ['open', 'full'])
+        target_date = parse_date(date)
+        if not target_date:
+            return jsonify({'error': 'invalid date format'}), 400
+
+        tours_ref = db.collection('tours')
         tours_docs = list(tours_ref.stream())
         
         result = []
         for tour_doc in tours_docs:
             tour_data = tour_doc.to_dict()
             tour_id = tour_doc.id
+
+            status = tour_data.get('status')
+            if status not in ['open', 'full']:
+                continue
+
+            start_date, end_date = get_tour_range_dates(tour_data.get('date'), tour_data.get('deadline_date'))
+            if not start_date or not end_date:
+                continue
+
+            if not (start_date <= target_date.date() <= end_date):
+                continue
             
             # 現在の予約数をカウント
             reservations_ref = db.collection('reservations').where('tour_id', '==', tour_id).where('status', '==', 'confirmed')
@@ -279,7 +367,7 @@ def create_reservation():
     """
     try:
         data = request.get_json()
-        line_user_id = data.get('lineUserId')
+        line_user_id = (data.get('lineUserId') or '').strip()
         date = data.get('date')
         tour_id = data.get('tourId')
         tour_title = data.get('tourTitle')
@@ -289,13 +377,28 @@ def create_reservation():
         pickups = data.get('pickups', [])
         preferred_seats = data.get('preferredSeats', [])
         consent_auto_fill = data.get('consentAutoFill', False)
+
+        if not all([date, tour_id, tour_title]):
+            return jsonify({'error': 'required fields missing'}), 400
+
+        if not line_user_id:
+            return jsonify({'error': 'lineUserId is required'}), 400
+
+        try:
+            passengers = int(passengers)
+            price_per_person = int(price_per_person)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'invalid numeric fields'}), 400
+
+        if passengers <= 0 or price_per_person < 0:
+            return jsonify({'error': 'invalid passengers or pricePerPerson'}), 400
         
         # トランザクション開始
         @firestore.transactional
         def transfer(transaction):
             # 1. ツアード情報取得
             tour_ref = db.collection('tours').document(tour_id)
-            tour_doc = transaction.get(tour_ref)
+            tour_doc = tour_ref.get(transaction=transaction)
             if not tour_doc.exists:
                 raise ValueError('Tour not found')
             
@@ -313,19 +416,25 @@ def create_reservation():
             if status != 'open':
                 raise ValueError(f'Tour status is {status}, cannot book')
             
-            # 4. 重複予約チェック
-            existing_ref = db.collection('reservations').where('line_user_id', '==', line_user_id).where('tour_id', '==', tour_id).where('date', '==', date).where('status', '==', 'confirmed')
-            existing = list(transaction.get(existing_ref) if hasattr(transaction, 'get') else [])
-            
-            # 代替手段：単純クエリ（transactionで直接クエリはできないため）
-            existing_docs = list(db.collection('reservations').where('lineUserId', '==', line_user_id).where('tour_id', '==', tour_id).where('date', '==', date).where('status', '==', 'confirmed').stream())
-            
-            if existing_docs:
-                raise ValueError('Duplicate reservation')
+            # 4. 重複予約チェック（lineUserId がある場合のみ）
+            all_reservation_docs = list(db.collection('reservations').stream())
+            for doc in all_reservation_docs:
+                reservation_data = doc.to_dict()
+                existing_line_user_id = reservation_data.get('lineUserId') or reservation_data.get('line_user_id')
+                if (
+                    reservation_data.get('status') == 'confirmed'
+                    and reservation_data.get('tour_id') == tour_id
+                    and reservation_data.get('date') == date
+                    and existing_line_user_id == line_user_id
+                ):
+                    raise ValueError('Duplicate reservation')
             
             # 5. 現在の予約人数をカウント
-            current_count_docs = db.collection('reservations').where('tour_id', '==', tour_id).where('status', '==', 'confirmed').stream()
-            current_count = sum(res.to_dict().get('passengers', 0) for res in current_count_docs)
+            current_count = 0
+            for res_doc in db.collection('reservations').stream():
+                reservation_data = res_doc.to_dict()
+                if reservation_data.get('tour_id') == tour_id and reservation_data.get('status') == 'confirmed':
+                    current_count += int(reservation_data.get('passengers', 0) or 0)
             
             # 6. 定員チェック
             if current_count + passengers > capacity:
@@ -337,6 +446,7 @@ def create_reservation():
             
             reservation = {
                 'lineUserId': line_user_id,
+                'line_user_id': line_user_id,
                 'tour_id': tour_id,
                 'date': date,
                 'tourTitle': tour_title,
@@ -346,6 +456,8 @@ def create_reservation():
                 'preferredSeats': preferred_seats,
                 'totalPrice': total_price,
                 'status': 'confirmed',
+                'progressStatus': 'shipping',
+                'remark': str((user_info or {}).get('remark') or '').strip(),
                 'createdAt': datetime.now().isoformat(),
                 'isManualEntry': False
             }
@@ -359,19 +471,21 @@ def create_reservation():
             if new_count >= capacity:
                 transaction.update(tour_ref, {'status': 'full', 'updatedAt': datetime.now().isoformat()})
             
-            # 9. 顧客情報 upsert
-            user_profile = {
-                'name': user_info.get('name'),
-                'phone': user_info.get('phone'),
-                'zip': user_info.get('zip'),
-                'pref': user_info.get('pref'),
-                'city': user_info.get('city'),
-                'street': user_info.get('street'),
-                'consentAutoFill': consent_auto_fill,
-                'updatedAt': datetime.now().isoformat()
-            }
-            user_profile_ref = db.collection('user_profiles').document(line_user_id)
-            transaction.set(user_profile_ref, user_profile, merge=True)
+            # 9. 顧客情報 upsert（lineUserId がある場合のみ）
+            if line_user_id:
+                user_profile = {
+                    'name': user_info.get('name'),
+                    'phone': user_info.get('phone'),
+                    'email': user_info.get('email'),
+                    'zip': user_info.get('zip'),
+                    'pref': user_info.get('pref'),
+                    'city': user_info.get('city'),
+                    'street': user_info.get('street'),
+                    'consentAutoFill': consent_auto_fill,
+                    'updatedAt': datetime.now().isoformat()
+                }
+                user_profile_ref = db.collection('user_profiles').document(line_user_id)
+                transaction.set(user_profile_ref, user_profile, merge=True)
             
             return reservation_id, total_price
         
@@ -379,7 +493,7 @@ def create_reservation():
         transaction = db.transaction()
         reservation_id, calculated_total_price = transfer(transaction)
         
-        # 10. LINE通知（通常予約のみ）
+        # 10. LINE通知（lineUserId がある通常予約のみ）
         message = f"""予約を受け付けました
 
 ツアー名：{tour_title}
@@ -388,8 +502,25 @@ def create_reservation():
 金額：¥{calculated_total_price:,}
 
 キャンセルの際は公式LINEからご連絡ください"""
-        
-        send_line_notification(line_user_id, message)
+
+        if line_user_id:
+            send_line_notification(line_user_id, message)
+
+        user_email = str((user_info or {}).get('email') or '').strip()
+        if user_email:
+            email_subject = f"【予約完了】{tour_title} ({date})"
+            email_body = f"""ご予約ありがとうございます。
+
+以下の内容で予約を受け付けました。
+
+予約ID: {reservation_id}
+ツアー名: {tour_title}
+日付: {date}
+人数: {passengers}名
+金額: ¥{calculated_total_price:,}
+
+キャンセルの際は公式LINEからご連絡ください。"""
+            send_reservation_email(user_email, email_subject, email_body)
         
         return jsonify({'id': reservation_id, 'message': 'Reservation confirmed'}), 200
     
