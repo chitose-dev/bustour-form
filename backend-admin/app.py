@@ -4,7 +4,7 @@ from flask_cors import CORS
 from admin_api import (
     login, get_reservations_api, update_reservation_api, create_reservation_api,
     get_tours_api, create_tour_api, update_tour_api, delete_tour_api,
-    get_pickups_api, create_pickup_api, update_pickup_api,
+    get_pickups_api, create_pickup_api, update_pickup_api, delete_pickup_api,
     upload_image_api
 )
 
@@ -66,6 +66,10 @@ def create_pickup_route():
 @app.route('/api/admin/pickups/<pickup_id>', methods=['PATCH'])
 def update_pickup_route(pickup_id):
     return update_pickup_api(pickup_id)
+
+@app.route('/api/admin/pickups/<pickup_id>', methods=['DELETE'])
+def delete_pickup_route(pickup_id):
+    return delete_pickup_api(pickup_id)
 
 # ---------------------------------
 # 画像アップロードエンドポイント
