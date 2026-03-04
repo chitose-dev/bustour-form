@@ -293,6 +293,10 @@
         let currentCalendarYear = new Date().getFullYear();
         let currentCalendarMonth = new Date().getMonth();
 
+        // LIFF状態管理
+        let liffReady = false;
+        let liffAccessToken = null;
+
         document.addEventListener('DOMContentLoaded', async () => {
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
             document.getElementById('screen-b01').classList.add('active');
@@ -301,24 +305,69 @@
                 if (typeof window.liff !== 'undefined') {
                     const liffId = "2009323831-cfxQtdaY";
                     await liff.init({ liffId });
-                    console.log("LIFF init OK. isLoggedIn:", liff.isLoggedIn(), "isInClient:", liff.isInClient(), "OS:", liff.getOS());
+                    
+                    const isLoggedIn = liff.isLoggedIn();
+                    const isInClient = liff.isInClient();
+                    const os = liff.getOS();
+                    console.log("LIFF init OK. isLoggedIn:", isLoggedIn, "isInClient:", isInClient, "OS:", os);
 
-                    if (liff.isLoggedIn()) {
-                        cache.lineUserId = await resolveLineUserId();
-                        console.log("LIFF initialized:", cache.lineUserId);
-                        if (!cache.lineUserId) {
-                            console.warn("LIFF logged in but no userId obtained. Debug:", window._liffDebug);
-                        }
-                        await loadUserProfile();
-                    } else {
+                    if (!isLoggedIn) {
                         console.log("Not logged in, redirecting to login...");
                         liff.login();
+                        return; // login後リダイレクトされるのでここで停止
                     }
+
+                    // ログイン済み → アクセストークン保存（これは確実に取れる）
+                    liffAccessToken = liff.getAccessToken();
+                    console.log("Access token obtained:", !!liffAccessToken);
+
+                    // userId取得を試行（取れなくてもOK、アクセストークンがある）
+                    try {
+                        const profile = await liff.getProfile();
+                        if (profile && profile.userId) {
+                            cache.lineUserId = profile.userId;
+                            console.log("Got userId from getProfile:", cache.lineUserId);
+                        }
+                    } catch (profileErr) {
+                        console.warn("getProfile failed (will use accessToken):", profileErr.message);
+                    }
+
+                    // getProfileで取れなかった場合、他の方法を試す
+                    if (!cache.lineUserId) {
+                        try {
+                            const ctx = liff.getContext();
+                            if (ctx && ctx.userId) {
+                                cache.lineUserId = ctx.userId;
+                                console.log("Got userId from getContext:", cache.lineUserId);
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                    if (!cache.lineUserId) {
+                        try {
+                            const decoded = liff.getDecodedIDToken();
+                            if (decoded && decoded.sub) {
+                                cache.lineUserId = decoded.sub;
+                                console.log("Got userId from IDToken:", cache.lineUserId);
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+
+                    liffReady = true;
+                    console.log("LIFF ready. userId:", cache.lineUserId, "hasAccessToken:", !!liffAccessToken);
+                    
+                    await loadUserProfile();
                 } else {
                     console.warn("LIFF SDK is not loaded. Continuing without LIFF.");
                 }
             } catch (err) {
                 console.error("LIFF init error:", err);
+                // LIFFエラーでもアクセストークンがあれば使える
+                try {
+                    if (typeof liff !== 'undefined' && liff.isLoggedIn()) {
+                        liffAccessToken = liff.getAccessToken();
+                        liffReady = true;
+                    }
+                } catch (e) { /* ignore */ }
             }
             
             await Promise.all([
@@ -379,17 +428,6 @@
             // 全て失敗 → デバッグ情報をコンソール＆画面表示
             console.error('resolveLineUserId all methods failed:', debugInfo);
             window._liffDebug = debugInfo;
-            return null;
-        }
-
-        function getLiffAccessToken() {
-            try {
-                if (typeof window.liff !== 'undefined' && liff.isLoggedIn()) {
-                    return liff.getAccessToken();
-                }
-            } catch (e) {
-                console.warn('getAccessToken failed:', e);
-            }
             return null;
         }
 
@@ -970,34 +1008,34 @@
         }
 
         async function ensureLineUserIdOrToken() {
-            // すでにuserIdがあればOK
-            if (cache.lineUserId) return { userId: cache.lineUserId, accessToken: null };
-
-            try {
-                if (typeof window.liff === 'undefined') return null;
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                    return null;
-                }
-
-                // userId取得を試行
-                cache.lineUserId = await resolveLineUserId();
-                if (cache.lineUserId) {
-                    return { userId: cache.lineUserId, accessToken: null };
-                }
-
-                // userId取得失敗 → アクセストークンをバックエンドに渡して解決してもらう
-                const token = getLiffAccessToken();
-                if (token) {
-                    console.log('userId unavailable, using accessToken fallback');
-                    return { userId: null, accessToken: token };
-                }
-
-                return null;
-            } catch (err) {
-                console.error('Failed to ensure lineUserId:', err);
-                return null;
+            // 1. すでにuserIdがあればOK
+            if (cache.lineUserId) {
+                return { userId: cache.lineUserId, accessToken: liffAccessToken || '' };
             }
+
+            // 2. LIFFが初期化済みで、アクセストークンがあれば送る（サーバー側でuserId解決）
+            if (liffAccessToken) {
+                return { userId: '', accessToken: liffAccessToken };
+            }
+
+            // 3. LIFFがまだ初期化されていない場合、再試行
+            try {
+                if (typeof window.liff !== 'undefined') {
+                    if (!liff.isLoggedIn()) {
+                        liff.login();
+                        return null;
+                    }
+                    // ログイン済みならトークン取得
+                    liffAccessToken = liff.getAccessToken();
+                    if (liffAccessToken) {
+                        return { userId: '', accessToken: liffAccessToken };
+                    }
+                }
+            } catch (e) {
+                console.error('ensureLineUserIdOrToken error:', e);
+            }
+
+            return null;
         }
 
         async function submitReservation() {
@@ -1014,8 +1052,15 @@
             try {
                 const lineInfo = await ensureLineUserIdOrToken();
                 if (!lineInfo) {
-                    const dbg = window._liffDebug ? '\n\n[Debug]\n' + window._liffDebug.join('\n') : '';
-                    alert("LINEユーザー情報を取得できませんでした。LINEアプリ内で開き直して再度お試しください。" + dbg);
+                    const state = {
+                        liffReady,
+                        hasUserId: !!cache.lineUserId,
+                        hasToken: !!liffAccessToken,
+                        liffExists: typeof window.liff !== 'undefined',
+                        isLoggedIn: typeof window.liff !== 'undefined' ? liff.isLoggedIn() : false,
+                        debug: window._liffDebug || []
+                    };
+                    alert("LINEユーザー情報を取得できませんでした。\n\n" + JSON.stringify(state, null, 2));
                     return;
                 }
 
