@@ -14,7 +14,7 @@ LINE_REPLY_API = 'https://api.line.me/v2/bot/message/reply'
 LINE_REQUEST_TIMEOUT = int(os.getenv('LINE_REQUEST_TIMEOUT', '10'))
 NOTIFICATION_DEDUP_SECONDS = float(os.getenv('NOTIFICATION_DEDUP_SECONDS', '5'))
 
-RESERVATION_TRIGGER_MESSAGE = '予約画面を表示しています...しばらくお待ちください。'
+RESERVATION_TRIGGER_MESSAGE = '予約確認画面を表示しています...しばらくお待ちください。'
 
 recent_notifications = {}
 
