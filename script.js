@@ -6,8 +6,8 @@
 // ==========================================
 // 設定・定数
 // ==========================================
-const USE_MOCK = true;
-const API_BASE_URL = "https://your-cloud-run-url-here/api/admin";
+const USE_MOCK = false;
+const API_BASE_URL = "https://backend-admin-482800127304.asia-northeast1.run.app/api/admin";
 
 // 状態管理
 let currentAuthToken = null;
@@ -224,15 +224,15 @@ function loadReservations() {
         const statusClass = r.status === 'confirmed' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
         const statusLabel = r.status === 'confirmed' ? '確定' : 'キャンセル';
 
-        tr.innerHTML = '<td class="p-3 lg:p-4 border-b font-mono text-xs lg:text-sm">' + r.id + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm">' + r.date + '</td>'
+        tr.innerHTML = '<td class="p-3 lg:p-4 border-b font-mono text-xs lg:text-sm whitespace-nowrap">' + r.id + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + r.tour_name + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm">' + r.name + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm">' + r.count + '名</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm">' + (r.pickup || '-') + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm">' + (r.seat_pref || '-') + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm">¥' + r.amount.toLocaleString() + '</td>'
-            + '<td class="p-3 lg:p-4 border-b"><span class="px-2 py-1 rounded text-xs font-bold ' + statusClass + '">' + statusLabel + '</span></td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.pickup || '-') + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
+            + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusClass + '">' + statusLabel + '</span></td>'
             + '<td class="p-3 lg:p-4 border-b space-x-1 whitespace-nowrap">'
             + '<button onclick="event.stopPropagation(); showReservationDetail(\'' + r.id + '\')" class="text-blue-600 underline text-xs lg:text-sm">詳細</button>'
             + (r.status === 'confirmed' ? ' <button onclick="event.stopPropagation(); updateReservationStatus(\'' + r.id + '\', \'cancelled\')" class="text-red-600 underline text-xs lg:text-sm">取消</button>' : '')
