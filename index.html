@@ -260,6 +260,10 @@
         let calendarData = {};
         let toursData = {};
 
+        function getCurrentMonthString() {
+            return `${currentCalendarYear}-${String(currentCalendarMonth + 1).padStart(2, '0')}`;
+        }
+
         const cache = {
             lineUserId: null,
             date: null,
@@ -298,21 +302,26 @@
             }
             
             await Promise.all([
-                loadCalendarData(),
+                loadCalendarData(getCurrentMonthString()),
                 loadPickupOptions()
             ]);
         });
 
-        async function loadCalendarData() {
+        async function loadCalendarData(month) {
             try {
-                const response = await fetch(`${BOOKING_API_BASE}/calendar`);
+                const response = await fetch(`${BOOKING_API_BASE}/calendar?month=${month}`);
                 if (response.ok) {
                     const data = await response.json();
                     calendarData = {};
-                    (data.dates || []).forEach(d => {
-                        calendarData[d] = true;
+                    Object.entries(data || {}).forEach(([dateStr, info]) => {
+                        calendarData[dateStr] = !!(info && info.available);
                     });
                     renderCalendar();
+                } else {
+                    const grid = document.getElementById('calendar-grid');
+                    if (grid) {
+                        grid.innerHTML = '<div class="h-14 flex items-center justify-center text-red-500">カレンダー取得エラー</div>';
+                    }
                 }
             } catch (err) {
                 console.error("Failed to load calendar:", err);
@@ -326,7 +335,13 @@
                     const tours = await response.json();
                     toursData = {};
                     tours.forEach(t => {
-                        toursData[t.id] = t;
+                        const normalizedTour = {
+                            ...t,
+                            imageUrl: t.imageUrl || t.image_url || '',
+                            remainingSeats: Math.max((t.capacity || 0) - (t.current_count || 0), 0),
+                            pickupIds: Array.isArray(t.pickupIds) ? t.pickupIds : []
+                        };
+                        toursData[t.id] = normalizedTour;
                     });
                     renderTourList(dateStr);
                 }
@@ -419,7 +434,7 @@
                 currentCalendarMonth = 11;
                 currentCalendarYear--;
             }
-            renderCalendar();
+            loadCalendarData(getCurrentMonthString());
         }
 
         function renderTourList(dateStr) {
