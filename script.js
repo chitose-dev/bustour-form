@@ -15,6 +15,51 @@ let cachedTours = [];
 let cachedReservations = [];
 let cachedPickups = [];
 
+function getAuthHeaders() {
+    return { Authorization: `Bearer ${currentAuthToken}` };
+}
+
+function normalizeTour(tour) {
+    return {
+        ...tour,
+        deadline: tour.deadline || tour.deadline_date || '',
+        imageUrl: tour.imageUrl || tour.image_url || '',
+        current: tour.current ?? tour.current_count ?? 0,
+        pickupIds: Array.isArray(tour.pickupIds) ? tour.pickupIds : []
+    };
+}
+
+function normalizePickup(pickup) {
+    return {
+        ...pickup,
+        active: pickup.active ?? pickup.isActive ?? true,
+        sortOrder: pickup.sortOrder ?? 0
+    };
+}
+
+function normalizeReservation(reservation) {
+    const userInfo = reservation.userInfo || {};
+    const pickups = Array.isArray(reservation.pickups) ? reservation.pickups : [];
+    const preferredSeats = Array.isArray(reservation.preferredSeats) ? reservation.preferredSeats : [];
+    const firstPickup = pickups.length > 0 ? pickups[0] : '';
+    const hasPreferredSeat = preferredSeats.some(Boolean);
+
+    return {
+        id: reservation.id,
+        tour_id: reservation.tour_id || reservation.tourId || '',
+        tour_name: reservation.tour_name || reservation.tourTitle || '',
+        date: reservation.date || '',
+        name: reservation.name || userInfo.name || '',
+        phone: reservation.phone || userInfo.phone || '',
+        address: reservation.address || `${userInfo.pref || ''}${userInfo.city || ''}${userInfo.street || ''}`,
+        count: reservation.count ?? reservation.passengers ?? 0,
+        amount: reservation.amount ?? reservation.totalPrice ?? 0,
+        status: reservation.status || 'confirmed',
+        pickup: reservation.pickup || firstPickup,
+        seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし')
+    };
+}
+
 // ==========================================
 // 1. 初期化・認証
 // ==========================================
@@ -43,7 +88,8 @@ async function handleLogin(e) {
                 const data = await res.json();
                 loginSuccess(data.token);
             } else {
-                alert('認証失敗');
+                const errorBody = await res.json().catch(() => ({}));
+                alert(errorBody.error === 'invalid_password' ? 'パスワードが違います' : '認証失敗');
             }
         } catch (err) {
             console.error(err);
@@ -57,7 +103,11 @@ function loginSuccess(token) {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('dashboard-screen').classList.remove('hidden');
     document.getElementById('dashboard-screen').classList.add('flex');
-    loadInitialData();
+    loadInitialData().catch((err) => {
+        console.error(err);
+        alert('初期データ取得に失敗しました。再ログインしてください。');
+        logout();
+    });
 }
 
 function logout() {
@@ -116,13 +166,27 @@ async function loadInitialData() {
         ];
     } else {
         const [resTours, resRes, resPick] = await Promise.all([
-            fetch(`${API_BASE_URL}/tours`, { headers: { Authorization: currentAuthToken } }),
-            fetch(`${API_BASE_URL}/reservations`, { headers: { Authorization: currentAuthToken } }),
-            fetch(`${API_BASE_URL}/pickups`, { headers: { Authorization: currentAuthToken } })
+            fetch(`${API_BASE_URL}/tours`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/reservations`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/pickups`, { headers: getAuthHeaders() })
         ]);
-        cachedTours = await resTours.json();
-        cachedReservations = await resRes.json();
-        cachedPickups = await resPick.json();
+
+        if (!resTours.ok || !resRes.ok || !resPick.ok) {
+            throw new Error('API request failed');
+        }
+
+        const toursData = await resTours.json();
+        const reservationsData = await resRes.json();
+        const pickupsData = await resPick.json();
+
+        cachedTours = (Array.isArray(toursData) ? toursData : []).map(normalizeTour);
+
+        const reservationArray = Array.isArray(reservationsData)
+            ? reservationsData
+            : (Array.isArray(reservationsData.reservations) ? reservationsData.reservations : []);
+        cachedReservations = reservationArray.map(normalizeReservation);
+
+        cachedPickups = (Array.isArray(pickupsData) ? pickupsData : []).map(normalizePickup);
     }
 
     populateFilterTourDropdown();
