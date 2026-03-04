@@ -136,7 +136,9 @@ def get_calendar():
         if not month_start:
             return jsonify({'error': 'invalid month format'}), 400
         month_start = month_start.date()
-        month_end = parse_date(f"{month}-31").date()
+        # 月末日を正しく算出（28/29/30/31日問題を回避）
+        next_month = month_start.replace(day=28) + timedelta(days=4)
+        month_end = (next_month - timedelta(days=next_month.day))
 
         for tour_doc in tours_docs:
             tour_data = tour_doc.to_dict()

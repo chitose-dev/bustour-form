@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>予約管理システム - プロトタイプ</title>
+    <title>予約システム</title>
     <link rel="icon" href="data:,">
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- LIFF SDK -->
@@ -758,8 +758,8 @@
             };
             cache.passengers = parseInt(document.getElementById('input-passengers').value);
 
-            const seatCheckbox = document.getElementById('preferred-seat-all');
-            const allSeats = seatCheckbox && seatCheckbox.checked;
+            const seatRadio = document.querySelector('input[name="preferred_seat"]:checked');
+            const allSeats = seatRadio && seatRadio.value === 'yes';
             cache.preferredSeats = Array(cache.passengers).fill(allSeats);
 
             const consent = document.getElementById('consent-next').checked;
@@ -774,26 +774,24 @@
         function setupPreferredSeatsUI() {
             const area = document.getElementById('preferred-seats-area');
             area.innerHTML = '';
+            const passengers = parseInt(document.getElementById('input-passengers').value) || 1;
+            const surcharge = PREFERRED_SEAT_PRICE * passengers;
 
             const container = document.createElement('div');
             container.className = "p-4 lg:p-6 bg-gray-50 rounded-lg border border-gray-200";
-
-            const label = document.createElement('label');
-            label.className = "flex items-center p-3 lg:p-4 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition";
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = 'preferred-seat-all';
-            checkbox.className = 'w-5 h-5 lg:w-7 lg:h-7 text-primary border-gray-300 rounded';
-            
-            const labelText = document.createElement('span');
-            labelText.className = 'ml-3 lg:ml-4 text-lg lg:text-2xl font-bold';
-            labelText.innerText = `前列座席を希望する（全員分 +¥${(PREFERRED_SEAT_PRICE * cache.passengers).toLocaleString()}）`;
-            
-            label.appendChild(checkbox);
-            label.appendChild(labelText);
-            container.appendChild(label);
-
+            container.innerHTML = `
+                <p class="font-bold text-lg lg:text-2xl mb-4">前列座席指定（全員分 +¥${surcharge.toLocaleString()}）</p>
+                <div class="flex flex-col gap-3">
+                    <label class="flex items-center p-3 lg:p-4 bg-white border-2 rounded-lg cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-yellow-50 transition">
+                        <input type="radio" name="preferred_seat" value="no" class="w-5 h-5 lg:w-7 lg:h-7" checked>
+                        <span class="ml-3 lg:ml-4 text-lg lg:text-xl font-bold">指定なし</span>
+                    </label>
+                    <label class="flex items-center p-3 lg:p-4 bg-white border-2 rounded-lg cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-yellow-50 transition">
+                        <input type="radio" name="preferred_seat" value="yes" class="w-5 h-5 lg:w-7 lg:h-7">
+                        <span class="ml-3 lg:ml-4 text-lg lg:text-xl font-bold">指定あり</span>
+                    </label>
+                </div>
+            `;
             area.appendChild(container);
         }
         
