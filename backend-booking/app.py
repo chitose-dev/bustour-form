@@ -370,6 +370,7 @@ def create_reservation():
     try:
         data = request.get_json()
         line_user_id = (data.get('lineUserId') or '').strip()
+        liff_access_token = (data.get('liffAccessToken') or '').strip()
         date = data.get('date')
         tour_id = data.get('tourId')
         tour_title = data.get('tourTitle')
@@ -383,8 +384,25 @@ def create_reservation():
         if not all([date, tour_id, tour_title]):
             return jsonify({'error': 'required fields missing'}), 400
 
+        # lineUserIdが無い場合、LIFFアクセストークンからLINE APIで取得
+        if not line_user_id and liff_access_token:
+            try:
+                resp = requests.get(
+                    'https://api.line.me/v2/profile',
+                    headers={'Authorization': f'Bearer {liff_access_token}'},
+                    timeout=5
+                )
+                if resp.status_code == 200:
+                    profile_data = resp.json()
+                    line_user_id = profile_data.get('userId', '')
+                    print(f'Resolved lineUserId from access token: {line_user_id}')
+                else:
+                    print(f'LINE profile API failed: {resp.status_code} {resp.text}')
+            except Exception as token_err:
+                print(f'Failed to resolve lineUserId from token: {token_err}')
+
         if not line_user_id:
-            return jsonify({'error': 'lineUserId is required'}), 400
+            return jsonify({'error': 'lineUserId is required. Please open from LINE app.'}), 400
 
         try:
             passengers = int(passengers)

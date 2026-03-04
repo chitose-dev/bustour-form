@@ -382,6 +382,17 @@
             return null;
         }
 
+        function getLiffAccessToken() {
+            try {
+                if (typeof window.liff !== 'undefined' && liff.isLoggedIn()) {
+                    return liff.getAccessToken();
+                }
+            } catch (e) {
+                console.warn('getAccessToken failed:', e);
+            }
+            return null;
+        }
+
         async function loadCalendarData(month) {
             try {
                 const targetMonth = month || getCurrentMonthString();
@@ -958,21 +969,34 @@
             container.appendChild(screen);
         }
 
-        async function ensureLineUserId() {
-            if (cache.lineUserId) return true;
+        async function ensureLineUserIdOrToken() {
+            // すでにuserIdがあればOK
+            if (cache.lineUserId) return { userId: cache.lineUserId, accessToken: null };
 
             try {
-                if (typeof window.liff === 'undefined') return false;
+                if (typeof window.liff === 'undefined') return null;
                 if (!liff.isLoggedIn()) {
                     liff.login();
-                    return false;
+                    return null;
                 }
 
+                // userId取得を試行
                 cache.lineUserId = await resolveLineUserId();
-                return !!cache.lineUserId;
+                if (cache.lineUserId) {
+                    return { userId: cache.lineUserId, accessToken: null };
+                }
+
+                // userId取得失敗 → アクセストークンをバックエンドに渡して解決してもらう
+                const token = getLiffAccessToken();
+                if (token) {
+                    console.log('userId unavailable, using accessToken fallback');
+                    return { userId: null, accessToken: token };
+                }
+
+                return null;
             } catch (err) {
                 console.error('Failed to ensure lineUserId:', err);
-                return false;
+                return null;
             }
         }
 
@@ -988,15 +1012,16 @@
             btn.innerText = "読み込み中…";
 
             try {
-                const hasLineUserId = await ensureLineUserId();
-                if (!hasLineUserId) {
+                const lineInfo = await ensureLineUserIdOrToken();
+                if (!lineInfo) {
                     const dbg = window._liffDebug ? '\n\n[Debug]\n' + window._liffDebug.join('\n') : '';
                     alert("LINEユーザー情報を取得できませんでした。LINEアプリ内で開き直して再度お試しください。" + dbg);
                     return;
                 }
 
                 const payload = {
-                    lineUserId: cache.lineUserId,
+                    lineUserId: lineInfo.userId || '',
+                    liffAccessToken: lineInfo.accessToken || '',
                     date: cache.date,
                     tourId: cache.tourId,
                     tourTitle: cache.tourTitle,
