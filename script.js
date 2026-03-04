@@ -48,7 +48,6 @@ function normalizeReservation(reservation) {
         id: reservation.id,
         lineUserId: reservation.lineUserId || reservation.line_user_id || '',
         progressStatus: reservation.progressStatus || reservation.progress_status || 'shipping',
-        remark: reservation.remark || '',
         tour_id: reservation.tour_id || reservation.tourId || '',
         tour_name: reservation.tour_name || reservation.tourTitle || '',
         date: reservation.date || '',
@@ -63,14 +62,14 @@ function normalizeReservation(reservation) {
     };
 }
 
-function getDisplayStatusKey(reservation) {
-    return reservation.status === 'cancelled' ? 'cancelled' : (reservation.progressStatus || 'shipping');
-}
-
 function getStatusMeta(statusKey) {
     if (statusKey === 'cancelled') return { label: 'キャンセル', className: 'text-red-600 bg-red-50' };
-    if (statusKey === 'middle') return { label: '中間', className: 'text-blue-600 bg-blue-50' };
-    if (statusKey === 'final') return { label: '最終', className: 'text-purple-600 bg-purple-50' };
+    return { label: '確定', className: 'text-green-600 bg-green-50' };
+}
+
+function getProgressMeta(progressKey) {
+    if (progressKey === 'middle') return { label: '中間', className: 'text-blue-600 bg-blue-50' };
+    if (progressKey === 'final') return { label: '最終', className: 'text-purple-600 bg-purple-50' };
     return { label: '発送', className: 'text-green-600 bg-green-50' };
 }
 
@@ -167,10 +166,10 @@ async function loadInitialData() {
             { id: 't3', title: '富士山日帰りバス', date: '2026-04-01', capacity: 45, price: 10000, status: 'stop', deadline: '2026-03-30', current: 0, pickupIds: [] }
         ];
         cachedReservations = [
-            { id: 'r1', tour_id: 't1', tour_name: '春の九州・温泉めぐり', date: '2026-03-15', name: '山田 太郎', phone: '090-1234-5678', address: '東京都新宿区西新宿1-1-1', count: 2, amount: 24000, status: 'confirmed', progressStatus: 'shipping', remark: '', pickup: '新宿駅 西口', seat_pref: 'あり' },
-            { id: 'r2', tour_id: 't1', tour_name: '春の九州・温泉めぐり', date: '2026-03-15', name: '佐藤 花子', phone: '080-9876-5432', address: '神奈川県横浜市中区1-2-3', count: 1, amount: 12000, status: 'confirmed', progressStatus: 'middle', remark: '', pickup: '横浜駅 東口', seat_pref: 'なし' },
-            { id: 'r3', tour_id: 't2', tour_name: '東京湾ナイトクルーズ', date: '2026-03-20', name: '鈴木 一郎', phone: '070-1111-2222', address: '埼玉県さいたま市大宮区3-4-5', count: 4, amount: 32000, status: 'confirmed', progressStatus: 'final', remark: '', pickup: '東京駅 丸の内北口', seat_pref: 'あり' },
-            { id: 'r4', tour_id: 't1', tour_name: '春の九州・温泉めぐり', date: '2026-03-15', name: '田中 キャンセル', phone: '090-0000-0000', address: '千葉県千葉市中央区5-6-7', count: 2, amount: 24000, status: 'cancelled', progressStatus: 'shipping', remark: '', pickup: '新宿駅 西口', seat_pref: 'なし' }
+            { id: 'r1', tour_id: 't1', tour_name: '春の九州・温泉めぐり', date: '2026-03-15', name: '山田 太郎', phone: '090-1234-5678', address: '東京都新宿区西新宿1-1-1', count: 2, amount: 24000, status: 'confirmed', progressStatus: 'shipping', pickup: '新宿駅 西口', seat_pref: 'あり' },
+            { id: 'r2', tour_id: 't1', tour_name: '春の九州・温泉めぐり', date: '2026-03-15', name: '佐藤 花子', phone: '080-9876-5432', address: '神奈川県横浜市中区1-2-3', count: 1, amount: 12000, status: 'confirmed', progressStatus: 'middle', pickup: '横浜駅 東口', seat_pref: 'なし' },
+            { id: 'r3', tour_id: 't2', tour_name: '東京湾ナイトクルーズ', date: '2026-03-20', name: '鈴木 一郎', phone: '070-1111-2222', address: '埼玉県さいたま市大宮区3-4-5', count: 4, amount: 32000, status: 'confirmed', progressStatus: 'final', pickup: '東京駅 丸の内北口', seat_pref: 'あり' },
+            { id: 'r4', tour_id: 't1', tour_name: '春の九州・温泉めぐり', date: '2026-03-15', name: '田中 キャンセル', phone: '090-0000-0000', address: '千葉県千葉市中央区5-6-7', count: 2, amount: 24000, status: 'cancelled', progressStatus: 'shipping', pickup: '新宿駅 西口', seat_pref: 'なし' }
         ];
         cachedPickups = [
             { id: 'p1', name: '新宿駅 西口', sortOrder: 1, active: true },
@@ -285,7 +284,7 @@ function loadReservations() {
     let filtered = cachedReservations.filter(function(r) {
         const matchTour = !filterTourId || r.tour_id === filterTourId;
         const matchDate = !filterDate || r.date === filterDate;
-        const matchStatus = filterStatus === 'all' || getDisplayStatusKey(r) === filterStatus;
+        const matchStatus = filterStatus === 'all' || r.status === filterStatus;
         return matchTour && matchDate && matchStatus;
     });
 
@@ -305,7 +304,8 @@ function loadReservations() {
     filtered.forEach(function(r) {
         const tr = document.createElement('tr');
         tr.className = 'cursor-pointer hover:bg-gray-50';
-        const statusMeta = getStatusMeta(getDisplayStatusKey(r));
+        const statusMeta = getStatusMeta(r.status);
+        const progressMeta = getProgressMeta(r.progressStatus);
 
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b font-mono text-xs lg:text-sm whitespace-nowrap">' + (r.lineUserId || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
@@ -316,13 +316,12 @@ function loadReservations() {
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm">' + (r.remark || '-') + '</td>'
+            + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></td>'
             + '<td class="p-3 lg:p-4 border-b space-x-1 whitespace-nowrap">'
             + '<button onclick="event.stopPropagation(); showReservationDetail(\'' + r.id + '\')" class="text-blue-600 underline text-xs lg:text-sm">詳細</button>'
             + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'shipping\')" class="text-green-600 underline text-xs lg:text-sm">発送</button>' : '')
             + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'middle\')" class="text-blue-600 underline text-xs lg:text-sm">中間</button>' : '')
             + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'final\')" class="text-purple-600 underline text-xs lg:text-sm">最終</button>' : '')
-            + ' <button onclick="event.stopPropagation(); updateReservationRemark(\'' + r.id + '\')" class="text-gray-600 underline text-xs lg:text-sm">備考</button>'
             + (r.status === 'confirmed' ? ' <button onclick="event.stopPropagation(); updateReservationStatus(\'' + r.id + '\', \'cancelled\')" class="text-red-600 underline text-xs lg:text-sm">取消</button>' : '')
             + '</td>';
         tr.onclick = function() { showReservationDetail(r.id); };
@@ -335,7 +334,8 @@ function showReservationDetail(id) {
     const r = cachedReservations.find(function(x) { return x.id === id; });
     if (!r) return;
     
-    const statusMeta = getStatusMeta(getDisplayStatusKey(r));
+    const statusMeta = getStatusMeta(r.status);
+    const progressMeta = getProgressMeta(r.progressStatus);
     
     const body = document.getElementById('reservation-detail-body');
     body.innerHTML = ''
@@ -356,7 +356,7 @@ function showReservationDetail(id) {
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">人数</span><span class="font-bold text-sm">' + r.count + '名</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">乗車地</span><span class="font-bold text-sm">' + (r.pickup || '-') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">前列座席</span><span class="font-bold text-sm">' + (r.seat_pref || '-') + '</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">備考</span><span class="font-bold text-sm text-right max-w-[60%]">' + (r.remark || '-') + '</span></div>'
+        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">備考</span><span class="font-bold text-sm text-right max-w-[60%]"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></span></div>'
         + '<hr>'
         + '<div class="flex justify-between items-center"><span class="text-gray-600 text-sm">合計金額</span><span class="font-bold text-lg text-red-600">¥' + r.amount.toLocaleString() + '</span></div>'
         + '</div>'
@@ -386,43 +386,6 @@ async function updateReservationProgress(id, progressStatus) {
         if (!res.ok) {
             const errorBody = await res.json().catch(() => ({}));
             alert(errorBody.error || '状態更新に失敗しました');
-            return;
-        }
-
-        await loadInitialData();
-        switchTab('reservations');
-    } catch (err) {
-        console.error(err);
-        alert('通信エラーが発生しました');
-    }
-}
-
-async function updateReservationRemark(id) {
-    const target = cachedReservations.find(function(r) { return r.id === id; });
-    if (!target) return;
-
-    const remark = prompt('備考を入力してください', target.remark || '');
-    if (remark === null) return;
-
-    if (USE_MOCK) {
-        target.remark = remark;
-        loadReservations();
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
-            method: 'PATCH',
-            headers: {
-                ...getAuthHeaders(),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ remark: remark })
-        });
-
-        if (!res.ok) {
-            const errorBody = await res.json().catch(() => ({}));
-            alert(errorBody.error || '備考更新に失敗しました');
             return;
         }
 
@@ -479,7 +442,6 @@ async function submitManualReservation() {
     const price = parseInt(document.getElementById('manual-price').value);
     const pickup = document.getElementById('manual-pickup').value;
     const seatPref = document.getElementById('manual-seat-pref').value;
-    const remark = document.getElementById('manual-remark').value || '';
 
     const tour = cachedTours.find(function(t) { return t.id === tourId; });
     const newRes = {
@@ -494,7 +456,6 @@ async function submitManualReservation() {
         amount: price,
         status: 'confirmed',
         progressStatus: 'shipping',
-        remark: remark,
         pickup: pickup,
         seat_pref: seatPref
     };
@@ -529,8 +490,7 @@ async function submitManualReservation() {
                 },
                 pickups: pickups,
                 preferred_seats: preferredSeats,
-                total_price: price,
-                remark: remark
+                total_price: price
             };
 
             const res = await fetch(`${API_BASE_URL}/reservations`, {
