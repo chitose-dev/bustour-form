@@ -821,20 +821,41 @@ async function addPickup() {
         return;
     }
     
-    // 表示順の重複チェック
-    const duplicate = cachedPickups.find(function(p) { return p.sortOrder === sortOrder; });
-    if (duplicate) {
-        alert('表示順 ' + sortOrder + ' は「' + duplicate.name + '」で既に使用されています。別の番号を指定してください。');
-        return;
-    }
+    // 表示順の重複がある場合、既存のものを後ろにずらして割り込ませる
+    const conflicting = cachedPickups
+        .filter(function(p) { return p.sortOrder >= sortOrder; })
+        .sort(function(a, b) { return a.sortOrder - b.sortOrder; });
     
     if (USE_MOCK) {
+        conflicting.forEach(function(p) { p.sortOrder++; });
         cachedPickups.push({ id: 'p_new_' + Date.now(), name: name, sortOrder: sortOrder, active: true });
         document.getElementById('new-pickup-name').value = '';
         if (sortInput) sortInput.value = '';
         loadPickups();
     } else {
         try {
+            // 重複する既存の乗車地を順番に+1ずらす（大きい方から更新して衝突を避ける）
+            const toShift = [];
+            for (var i = 0; i < conflicting.length; i++) {
+                var expected = sortOrder + i;
+                if (conflicting[i].sortOrder === expected) {
+                    toShift.push(conflicting[i]);
+                } else {
+                    break; // 連続しなくなったらそれ以降はずらさなくてOK
+                }
+            }
+            
+            for (var j = toShift.length - 1; j >= 0; j--) {
+                await fetch(`${API_BASE_URL}/pickups/${toShift[j].id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ sortOrder: toShift[j].sortOrder + 1 })
+                });
+            }
+
             const res = await fetch(`${API_BASE_URL}/pickups`, {
                 method: 'POST',
                 headers: {
