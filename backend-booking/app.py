@@ -272,7 +272,8 @@ def get_tours():
                 'image_url': tour_data.get('image_url'),
                 'description': tour_data.get('description'),
                 'capacity': tour_data.get('capacity'),
-                'current_count': current_count
+                'current_count': current_count,
+                'pickupIds': tour_data.get('pickupIds', [])
             })
         
         return jsonify(result), 200
@@ -385,6 +386,7 @@ def create_reservation():
             return jsonify({'error': 'required fields missing'}), 400
 
         # lineUserIdが無い場合、LIFFアクセストークンからLINE APIで取得
+        line_display_name = ''
         if not line_user_id and liff_access_token:
             try:
                 resp = requests.get(
@@ -395,11 +397,25 @@ def create_reservation():
                 if resp.status_code == 200:
                     profile_data = resp.json()
                     line_user_id = profile_data.get('userId', '')
+                    line_display_name = profile_data.get('displayName', '')
                     print(f'Resolved lineUserId from access token: {line_user_id}')
                 else:
                     print(f'LINE profile API failed: {resp.status_code} {resp.text}')
             except Exception as token_err:
                 print(f'Failed to resolve lineUserId from token: {token_err}')
+        elif line_user_id and liff_access_token:
+            # lineUserIdがある場合でもdisplayNameを取得
+            try:
+                resp = requests.get(
+                    'https://api.line.me/v2/profile',
+                    headers={'Authorization': f'Bearer {liff_access_token}'},
+                    timeout=5
+                )
+                if resp.status_code == 200:
+                    profile_data = resp.json()
+                    line_display_name = profile_data.get('displayName', '')
+            except Exception:
+                pass
 
         if not line_user_id:
             return jsonify({'error': 'lineUserId is required. Please open from LINE app.'}), 400
@@ -467,6 +483,7 @@ def create_reservation():
             reservation = {
                 'lineUserId': line_user_id,
                 'line_user_id': line_user_id,
+                'lineDisplayName': line_display_name,
                 'tour_id': tour_id,
                 'date': date,
                 'tourTitle': tour_title,

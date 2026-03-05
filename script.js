@@ -47,6 +47,7 @@ function normalizeReservation(reservation) {
     return {
         id: reservation.id,
         lineUserId: reservation.lineUserId || reservation.line_user_id || '',
+        lineDisplayName: reservation.lineDisplayName || '',
         progressStatus: reservation.progressStatus || reservation.progress_status || 'shipping',
         tour_id: reservation.tour_id || reservation.tourId || '',
         tour_name: reservation.tour_name || reservation.tourTitle || '',
@@ -286,7 +287,7 @@ function downloadCSV() {
         return matchTour && matchDate && matchStatus;
     });
 
-    const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '人数', '乗車地', '前列座席', '金額', 'ステータス', '進捗'];
+    const headers = ['ツアー日', 'ツアー名', '氏名', 'LINE表示名', '電話番号', '住所', '人数', '乗車地', '前列座席', '金額', 'ステータス', '進捗'];
     const rows = filtered.map(function(r) {
         const statusLabel = r.status === 'cancelled' ? 'キャンセル' : '確定';
         const progressLabel = r.progressStatus === 'middle' ? '中間' : r.progressStatus === 'final' ? '最終' : '発送';
@@ -294,6 +295,7 @@ function downloadCSV() {
             r.date,
             r.tour_name,
             r.name,
+            r.lineDisplayName || '',
             r.phone || '',
             r.address || '',
             r.count,
@@ -359,6 +361,7 @@ function loadReservations() {
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + r.tour_name + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.pickup || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
@@ -394,6 +397,7 @@ function showReservationDetail(id) {
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">ツアー日</span><span class="font-bold text-sm">' + r.date + '</span></div>'
         + '<hr>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">氏名</span><span class="font-bold text-sm">' + r.name + '</span></div>'
+        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">LINE表示名</span><span class="font-bold text-sm text-gray-500">' + (r.lineDisplayName || '-') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">電話番号</span><span class="font-bold text-sm">' + (r.phone || '-') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">住所</span><span class="font-bold text-sm text-right max-w-[60%]">' + (r.address || '-') + '</span></div>'
         + '<hr>'
@@ -814,6 +818,13 @@ async function addPickup() {
     
     if (!name) {
         alert('乗車地名を入力してください');
+        return;
+    }
+    
+    // 表示順の重複チェック
+    const duplicate = cachedPickups.find(function(p) { return p.sortOrder === sortOrder; });
+    if (duplicate) {
+        alert('表示順 ' + sortOrder + ' は「' + duplicate.name + '」で既に使用されています。別の番号を指定してください。');
         return;
     }
     
