@@ -273,6 +273,55 @@ function closeModal(modalId) {
     document.getElementById(modalId).classList.add('hidden');
 }
 
+// CSVダウンロード
+function downloadCSV() {
+    const filterTourId = document.getElementById('filter-tour-name').value;
+    const filterDate = document.getElementById('filter-date').value;
+    const filterStatus = document.getElementById('filter-status').value;
+
+    let filtered = cachedReservations.filter(function(r) {
+        const matchTour = !filterTourId || r.tour_id === filterTourId;
+        const matchDate = !filterDate || r.date === filterDate;
+        const matchStatus = filterStatus === 'all' || r.status === filterStatus;
+        return matchTour && matchDate && matchStatus;
+    });
+
+    const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '人数', '乗車地', '前列座席', '金額', 'ステータス', '進捗'];
+    const rows = filtered.map(function(r) {
+        const statusLabel = r.status === 'cancelled' ? 'キャンセル' : '確定';
+        const progressLabel = r.progressStatus === 'middle' ? '中間' : r.progressStatus === 'final' ? '最終' : '発送';
+        return [
+            r.date,
+            r.tour_name,
+            r.name,
+            r.phone || '',
+            r.address || '',
+            r.count,
+            r.pickup || '',
+            r.seat_pref || 'なし',
+            r.amount,
+            statusLabel,
+            progressLabel
+        ];
+    });
+
+    const csvContent = '\uFEFF' + [headers].concat(rows).map(function(row) {
+        return row.map(function(cell) {
+            const str = String(cell).replace(/"/g, '""');
+            return '"' + str + '"';
+        }).join(',');
+    }).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = '予約台帳_' + today + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 // ==========================================
 // 4. 予約台帳機能 (A-02/A-03)
 // ==========================================
@@ -307,8 +356,7 @@ function loadReservations() {
         const statusMeta = getStatusMeta(r.status);
         const progressMeta = getProgressMeta(r.progressStatus);
 
-        tr.innerHTML = '<td class="p-3 lg:p-4 border-b font-mono text-xs lg:text-sm whitespace-nowrap">' + (r.lineUserId || '-') + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
+        tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + r.tour_name + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
@@ -339,10 +387,6 @@ function showReservationDetail(id) {
     
     const body = document.getElementById('reservation-detail-body');
     body.innerHTML = ''
-        + '<div class="flex justify-between items-center mb-2">'
-        + '<span class="text-gray-500 text-sm">LINE ID</span>'
-        + '<span class="font-mono text-sm">' + (r.lineUserId || '-') + '</span>'
-        + '</div>'
         + '<div class="bg-gray-50 rounded-lg p-4 space-y-3 border">'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">状態</span><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></div>'
         + '<hr>'

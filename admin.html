@@ -131,7 +131,10 @@
                         <p class="text-sm opacity-80">売上合計金額</p>
                         <p class="text-2xl lg:text-3xl font-bold" id="summary-sales">¥0</p>
                     </div>
-                    <div class="flex-1 flex items-center justify-end">
+                    <div class="flex-1 flex items-center justify-end gap-2">
+                        <button onclick="downloadCSV()" class="w-full sm:w-auto bg-white hover:bg-gray-100 text-gray-800 font-bold py-3 px-6 rounded-lg shadow border border-gray-300">
+                            <i class="fa-solid fa-file-csv mr-1"></i> CSVダウンロード
+                        </button>
                         <button onclick="openModal('modal-add-reservation')" class="w-full sm:w-auto bg-primary hover:bg-primary-hover text-black font-bold py-3 px-6 rounded-lg shadow border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
                             + 手動予約追加
                         </button>
