@@ -276,8 +276,10 @@ function openModal(modalId) {
         });
     }
     
-    if (modalId === 'modal-tour-editor') {
-        renderTourPickupCheckboxes();
+    if (modalId === 'modal-tour-editor' && !document.getElementById('edit-tour-id').value) {
+        document.getElementById('form-tour-editor').reset();
+        document.getElementById('edit-tour-id').value = '';
+        renderTourPickupCheckboxes([]);
     }
 }
 
