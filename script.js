@@ -791,9 +791,15 @@ function loadPickups() {
     
     var sorted = cachedPickups.slice().sort(function(a, b) { return a.sortOrder - b.sortOrder; });
     
-    sorted.forEach(function(p) {
+    sorted.forEach(function(p, idx) {
+        const isFirst = idx === 0;
+        const isLast = idx === sorted.length - 1;
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm text-center">' + p.sortOrder + '</td>'
+        tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-center">'
+            + '<div class="flex flex-col items-center gap-1">'
+            + '<button onclick="movePickup(\'' + p.id + '\', -1)" class="text-gray-400 hover:text-gray-700 text-sm leading-none' + (isFirst ? ' invisible' : '') + '" title="上へ"><i class="fa-solid fa-caret-up text-lg"></i></button>'
+            + '<button onclick="movePickup(\'' + p.id + '\', 1)" class="text-gray-400 hover:text-gray-700 text-sm leading-none' + (isLast ? ' invisible' : '') + '" title="下へ"><i class="fa-solid fa-caret-down text-lg"></i></button>'
+            + '</div></td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + p.name + '</td>'
             + '<td class="p-3 lg:p-4 border-b">'
             + '<button onclick="togglePickupActive(\'' + p.id + '\')" class="px-3 py-1 rounded text-xs font-bold cursor-pointer transition '
@@ -803,6 +809,44 @@ function loadPickups() {
             + '<td class="p-3 lg:p-4 border-b"><button onclick="deletePickup(\'' + p.id + '\')" class="text-red-600 hover:text-red-800 text-sm underline">削除</button></td>';
         tbody.appendChild(tr);
     });
+}
+
+async function movePickup(id, direction) {
+    var sorted = cachedPickups.slice().sort(function(a, b) { return a.sortOrder - b.sortOrder; });
+    var idx = sorted.findIndex(function(p) { return p.id === id; });
+    if (idx < 0) return;
+    var swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+    var current = sorted[idx];
+    var target = sorted[swapIdx];
+    var tmpOrder = current.sortOrder;
+    current.sortOrder = target.sortOrder;
+    target.sortOrder = tmpOrder;
+
+    loadPickups();
+
+    if (!USE_MOCK) {
+        try {
+            await Promise.all([
+                fetch(`${API_BASE_URL}/pickups/${current.id}`, {
+                    method: 'PATCH',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sortOrder: current.sortOrder })
+                }),
+                fetch(`${API_BASE_URL}/pickups/${target.id}`, {
+                    method: 'PATCH',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sortOrder: target.sortOrder })
+                })
+            ]);
+        } catch (err) {
+            console.error(err);
+            alert('並び順の保存に失敗しました');
+            await loadInitialData();
+            switchTab('pickups');
+        }
+    }
 }
 
 async function togglePickupActive(id) {
@@ -841,49 +885,22 @@ async function togglePickupActive(id) {
 
 async function addPickup() {
     const name = document.getElementById('new-pickup-name').value.trim();
-    const sortInput = document.getElementById('new-pickup-sort');
-    const sortOrder = sortInput ? parseInt(sortInput.value) || (cachedPickups.length + 1) : (cachedPickups.length + 1);
     
     if (!name) {
         alert('乗車地名を入力してください');
         return;
     }
     
-    // 表示順の重複がある場合、既存のものを後ろにずらして割り込ませる
-    const conflicting = cachedPickups
-        .filter(function(p) { return p.sortOrder >= sortOrder; })
-        .sort(function(a, b) { return a.sortOrder - b.sortOrder; });
+    // 新規は末尾に追加
+    const maxOrder = cachedPickups.reduce(function(max, p) { return Math.max(max, p.sortOrder || 0); }, 0);
+    const sortOrder = maxOrder + 1;
     
     if (USE_MOCK) {
-        conflicting.forEach(function(p) { p.sortOrder++; });
         cachedPickups.push({ id: 'p_new_' + Date.now(), name: name, sortOrder: sortOrder, active: true });
         document.getElementById('new-pickup-name').value = '';
-        if (sortInput) sortInput.value = '';
         loadPickups();
     } else {
         try {
-            // 重複する既存の乗車地を順番に+1ずらす（大きい方から更新して衝突を避ける）
-            const toShift = [];
-            for (var i = 0; i < conflicting.length; i++) {
-                var expected = sortOrder + i;
-                if (conflicting[i].sortOrder === expected) {
-                    toShift.push(conflicting[i]);
-                } else {
-                    break; // 連続しなくなったらそれ以降はずらさなくてOK
-                }
-            }
-            
-            for (var j = toShift.length - 1; j >= 0; j--) {
-                await fetch(`${API_BASE_URL}/pickups/${toShift[j].id}`, {
-                    method: 'PATCH',
-                    headers: {
-                        ...getAuthHeaders(),
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ sortOrder: toShift[j].sortOrder + 1 })
-                });
-            }
-
             const res = await fetch(`${API_BASE_URL}/pickups`, {
                 method: 'POST',
                 headers: {
@@ -904,7 +921,6 @@ async function addPickup() {
             }
 
             document.getElementById('new-pickup-name').value = '';
-            if (sortInput) sortInput.value = '';
             await loadInitialData();
             switchTab('pickups');
         } catch (err) {
