@@ -18,6 +18,7 @@ db = firestore.Client()
 
 # 定数
 PREFERRED_SEAT_PRICE = 500
+WAITLIST_MAX = 3  # キャンセル待ち最大枠数
 LINE_CHANNEL_TOKEN = os.getenv('LINE_CHANNEL_TOKEN', 'YOUR_LINE_CHANNEL_TOKEN')
 LINE_MESSAGING_API = 'https://api.line.me/v2/bot/message/push'
 SMTP_HOST = os.getenv('SMTP_HOST', '')
@@ -142,6 +143,7 @@ def get_calendar():
 
         for tour_doc in tours_docs:
             tour_data = tour_doc.to_dict()
+            tour_data['id'] = tour_doc.id  # ドキュメントIDを保持
             start_str = tour_data.get('date')
             end_str = tour_data.get('deadline_date')
             start_date, end_date = get_tour_range_dates(start_str, end_str)
@@ -161,6 +163,18 @@ def get_calendar():
                     tour_by_date[date_key] = []
                 tour_by_date[date_key].append(tour_data)
                 cursor += timedelta(days=1)
+
+        # キャンセル待ち予約数をツアーIDごとに集計
+        waitlist_by_tour = {}
+        try:
+            waitlist_docs = db.collection('reservations').where('status', '==', 'waitlist').stream()
+            for wl_doc in waitlist_docs:
+                wl_data = wl_doc.to_dict()
+                tid = wl_data.get('tour_id')
+                if tid:
+                    waitlist_by_tour[tid] = waitlist_by_tour.get(tid, 0) + 1
+        except Exception as wl_err:
+            print(f"Waitlist count error: {wl_err}")
         
         # カレンダー用の結果を生成
         result = {}
@@ -199,20 +213,38 @@ def get_calendar():
                     break
                 
                 if not has_open:
-                    available = False
-                    # 理由を詳細化
-                    tour_sample = tour_by_date[date_str][0]
-                    deadline = tour_sample.get('deadline_date')
-                    status = tour_sample.get('status', 'open')
-                    
-                    if deadline and deadline < today.strftime('%Y-%m-%d'):
-                        reason = 'deadline_passed'
-                    elif status == 'full':
-                        reason = 'full'
-                    elif status == 'stop':
-                        reason = 'stop'
-                    elif status == 'hidden':
-                        reason = 'hidden'
+                    # fullだがキャンセル待ち枠が残っているツアーがあるかチェック
+                    has_waitlist_available = False
+                    for tour in tour_by_date[date_str]:
+                        t_deadline = tour.get('deadline_date')
+                        t_status = tour.get('status', 'open')
+                        if t_deadline and t_deadline < today.strftime('%Y-%m-%d'):
+                            continue
+                        if t_status == 'full':
+                            t_id = tour.get('id')
+                            wl_count = waitlist_by_tour.get(t_id, 0)
+                            if wl_count < WAITLIST_MAX:
+                                has_waitlist_available = True
+                                break
+
+                    if has_waitlist_available:
+                        available = True
+                        reason = 'waitlist'
+                    else:
+                        available = False
+                        # 理由を詳細化
+                        tour_sample = tour_by_date[date_str][0]
+                        deadline = tour_sample.get('deadline_date')
+                        status = tour_sample.get('status', 'open')
+                        
+                        if deadline and deadline < today.strftime('%Y-%m-%d'):
+                            reason = 'deadline_passed'
+                        elif status == 'full':
+                            reason = 'full'
+                        elif status == 'stop':
+                            reason = 'stop'
+                        elif status == 'hidden':
+                            reason = 'hidden'
             
             result[date_str] = {
                 'available': available,
@@ -260,9 +292,16 @@ def get_tours():
             if not (start_date <= target_date.date() <= end_date):
                 continue
             
-            # 現在の予約数をカウント
-            reservations_ref = db.collection('reservations').where('tour_id', '==', tour_id).where('status', '==', 'confirmed')
-            current_count = sum(res.to_dict().get('passengers', 0) for res in reservations_ref.stream())
+            # 現在の予約数をカウント（確定のみ）
+            current_count = 0
+            waitlist_count = 0
+            tour_reservations = db.collection('reservations').where('tour_id', '==', tour_id).stream()
+            for res in tour_reservations:
+                r_data = res.to_dict()
+                if r_data.get('status') == 'confirmed':
+                    current_count += r_data.get('passengers', 0)
+                elif r_data.get('status') == 'waitlist':
+                    waitlist_count += 1
             
             result.append({
                 'id': tour_id,
@@ -273,6 +312,9 @@ def get_tours():
                 'description': tour_data.get('description'),
                 'capacity': tour_data.get('capacity'),
                 'current_count': current_count,
+                'waitlist_count': waitlist_count,
+                'waitlist_max': WAITLIST_MAX,
+                'waitlist_available': tour_data.get('status') == 'full' and waitlist_count < WAITLIST_MAX,
                 'pickupIds': tour_data.get('pickupIds', [])
             })
         
@@ -448,17 +490,30 @@ def create_reservation():
             if deadline_date and deadline_date < today:
                 raise ValueError('Booking deadline passed')
             
-            # 3. ステータスチェック（openのみ受付）
-            if status != 'open':
+            # 3. ステータスチェック（open または full でキャンセル待ち枠あり）
+            is_waitlist = False
+            if status == 'open':
+                pass  # 通常予約
+            elif status == 'full':
+                # キャンセル待ち枠をチェック
+                waitlist_count = 0
+                for res_doc in db.collection('reservations').stream():
+                    rd = res_doc.to_dict()
+                    if rd.get('tour_id') == tour_id and rd.get('status') == 'waitlist':
+                        waitlist_count += 1
+                if waitlist_count >= WAITLIST_MAX:
+                    raise ValueError('Waitlist full')
+                is_waitlist = True
+            else:
                 raise ValueError(f'Tour status is {status}, cannot book')
             
-            # 4. 重複予約チェック（lineUserId がある場合のみ）
+            # 4. 重複予約チェック（lineUserId がある場合のみ、confirmed と waitlist 両方チェック）
             all_reservation_docs = list(db.collection('reservations').stream())
             for doc in all_reservation_docs:
                 reservation_data = doc.to_dict()
                 existing_line_user_id = reservation_data.get('lineUserId') or reservation_data.get('line_user_id')
                 if (
-                    reservation_data.get('status') == 'confirmed'
+                    reservation_data.get('status') in ('confirmed', 'waitlist')
                     and reservation_data.get('tour_id') == tour_id
                     and reservation_data.get('date') == date
                     and existing_line_user_id == line_user_id
@@ -472,14 +527,15 @@ def create_reservation():
                 if reservation_data.get('tour_id') == tour_id and reservation_data.get('status') == 'confirmed':
                     current_count += int(reservation_data.get('passengers', 0) or 0)
             
-            # 6. 定員チェック
-            if current_count + passengers > capacity:
+            # 6. 定員チェック（キャンセル待ちの場合はスキップ）
+            if not is_waitlist and current_count + passengers > capacity:
                 raise ValueError('Capacity exceeded')
             
             # 7. 予約作成
             seat_upcharge = len([s for s in preferred_seats if s]) * PREFERRED_SEAT_PRICE
             total_price = passengers * price_per_person + seat_upcharge
             
+            reservation_status = 'waitlist' if is_waitlist else 'confirmed'
             reservation = {
                 'lineUserId': line_user_id,
                 'line_user_id': line_user_id,
@@ -492,21 +548,23 @@ def create_reservation():
                 'pickups': pickups,
                 'preferredSeats': preferred_seats,
                 'totalPrice': total_price,
-                'status': 'confirmed',
+                'status': reservation_status,
                 'progressStatus': 'shipping',
                 'remark': str((user_info or {}).get('remark') or '').strip(),
                 'createdAt': datetime.now().isoformat(),
-                'isManualEntry': False
+                'isManualEntry': False,
+                'isWaitlist': is_waitlist
             }
             
             res_ref = db.collection('reservations').document()
             transaction.set(res_ref, reservation)
             reservation_id = res_ref.id
             
-            # 8. 満席チェック＆ステータス更新
-            new_count = current_count + passengers
-            if new_count >= capacity:
-                transaction.update(tour_ref, {'status': 'full', 'updatedAt': datetime.now().isoformat()})
+            # 8. 満席チェック＆ステータス更新（通常予約のみ）
+            if not is_waitlist:
+                new_count = current_count + passengers
+                if new_count >= capacity:
+                    transaction.update(tour_ref, {'status': 'full', 'updatedAt': datetime.now().isoformat()})
             
             # 9. 顧客情報 upsert（lineUserId がある場合のみ）
             if line_user_id:
@@ -524,11 +582,11 @@ def create_reservation():
                 user_profile_ref = db.collection('user_profiles').document(line_user_id)
                 transaction.set(user_profile_ref, user_profile, merge=True)
             
-            return reservation_id, total_price
+            return reservation_id, total_price, is_waitlist
         
         # トランザクション実行
         transaction = db.transaction()
-        reservation_id, calculated_total_price = transfer(transaction)
+        reservation_id, calculated_total_price, is_waitlist = transfer(transaction)
         
         # 10. LINE通知（lineUserId がある通常予約のみ）
         # 乗車地表示を組み立て
@@ -550,7 +608,9 @@ def create_reservation():
         seat_count = len([s for s in preferred_seats if s])
         seat_display = f'あり（{seat_count}名分）' if seat_count > 0 else 'なし'
 
-        message = f"""下記の通りお申込を承りました。
+        waitlist_label = '【キャンセル待ち】' if is_waitlist else ''
+        status_label = 'キャンセル待ち受付' if is_waitlist else '申込受付中'
+        message = f"""{ waitlist_label }下記の通りお申込を承りました。
 
 📅 日付: {date}
 🚌 コース名: {tour_title}
@@ -561,7 +621,7 @@ def create_reservation():
 🚏 乗車地: 
 {pickup_display}
 
-📝 お申込み状況: 申込受付中
+📝 お申込み状況: {status_label}
 
 お問い合わせありがとうございます。
 正式なご予約は、弊社からのご連絡をもって確定となります。
@@ -595,12 +655,13 @@ def create_reservation():
 キャンセルの際は公式LINEからご連絡ください。"""
             send_reservation_email(user_email, email_subject, email_body)
         
-        return jsonify({'id': reservation_id, 'message': 'Reservation confirmed'}), 200
+        result_msg = 'Waitlist reservation created' if is_waitlist else 'Reservation confirmed'
+        return jsonify({'id': reservation_id, 'message': result_msg, 'isWaitlist': is_waitlist}), 200
     
     except ValueError as e:
         if 'Duplicate' in str(e):
             return jsonify({'error': str(e)}), 409
-        elif 'Capacity' in str(e):
+        elif 'Capacity' in str(e) or 'Waitlist full' in str(e):
             return jsonify({'error': str(e)}), 400
         elif 'deadline' in str(e):
             return jsonify({'error': str(e)}), 400

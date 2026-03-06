@@ -286,7 +286,8 @@
             passengers: 1,
             pickups: [],
             preferredSeats: [],
-            isSubmitting: false
+            isSubmitting: false,
+            isWaitlist: false
         };
 
         // カレンダー表示用の年月管理
@@ -464,7 +465,10 @@
                             ...t,
                             imageUrl: t.imageUrl || t.image_url || '',
                             remainingSeats: Math.max((t.capacity || 0) - (t.current_count || 0), 0),
-                            pickupIds: Array.isArray(t.pickupIds) ? t.pickupIds : []
+                            pickupIds: Array.isArray(t.pickupIds) ? t.pickupIds : [],
+                            waitlist_count: t.waitlist_count || 0,
+                            waitlist_max: t.waitlist_max || 3,
+                            waitlist_available: t.waitlist_available || false
                         };
                         toursData[t.id] = normalizedTour;
                     });
@@ -678,11 +682,24 @@
             cache.tourId = tourId;
             cache.tourTitle = title;
             cache.pricePerPerson = price;
+            cache.isWaitlist = false;
             cache.passengers = parseInt(document.getElementById('input-passengers').value) || 1;
             setupPreferredSeatsUI();
             goTo('screen-b03');
             
             // キャッシュがあれば自動でダイアログ表示
+            checkAutoFillCache();
+        }
+
+        function selectTourWaitlist(tourId, title, price) {
+            if (!confirm('このツアーは満席です。キャンセル待ちとして予約しますか？\nキャンセルが出た場合に担当者からご連絡いたします。')) return;
+            cache.tourId = tourId;
+            cache.tourTitle = title;
+            cache.pricePerPerson = price;
+            cache.isWaitlist = true;
+            cache.passengers = parseInt(document.getElementById('input-passengers').value) || 1;
+            setupPreferredSeatsUI();
+            goTo('screen-b03');
             checkAutoFillCache();
         }
 
@@ -934,6 +951,28 @@
             const address = (cache.userInfo.pref || '') + (cache.userInfo.city || '') + (cache.userInfo.street || '');
             document.getElementById('conf-address').innerText = address || '未入力';
             document.getElementById('conf-passengers').innerText = cache.passengers + "名";
+
+            // キャンセル待ちバナー表示
+            const waitlistBanner = document.getElementById('conf-waitlist-banner');
+            if (waitlistBanner) waitlistBanner.remove();
+            if (cache.isWaitlist) {
+                const banner = document.createElement('div');
+                banner.id = 'conf-waitlist-banner';
+                banner.className = 'bg-orange-50 border-2 border-orange-300 p-4 rounded-xl mb-4 text-center';
+                banner.innerHTML = '<p class="text-orange-700 font-bold text-lg">⚠️ キャンセル待ち予約です</p><p class="text-orange-600 text-sm mt-1">キャンセルが出た場合にご予約が確定します</p>';
+                const confBox = document.getElementById('conf-tour').closest('.bg-gray-50');
+                confBox.parentNode.insertBefore(banner, confBox);
+            }
+
+            // ボタンテキスト変更
+            const confirmBtn = document.getElementById('btn-confirm-reservation');
+            if (cache.isWaitlist) {
+                confirmBtn.innerText = 'キャンセル待ちで予約する';
+                confirmBtn.className = 'w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 lg:py-6 rounded-xl text-2xl lg:text-3xl shadow-lg border-b-4 border-orange-700 active:border-b-0 active:translate-y-1 transition-colors';
+            } else {
+                confirmBtn.innerText = '予約を確定する';
+                confirmBtn.className = 'w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 lg:py-6 rounded-xl text-2xl lg:text-3xl shadow-lg border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1 transition-colors';
+            }
             
             const baseTour = cache.pricePerPerson * cache.passengers;
             const seatUpchargeCount = cache.preferredSeats.filter(s => s).length;
@@ -974,14 +1013,26 @@
                 existing.remove();
             }
             
+            const isWaitlist = cache.isWaitlist;
+            const icon = isWaitlist ? '⏳' : '✅';
+            const heading = isWaitlist ? 'キャンセル待ちを受け付けました' : '予約を受け付けました';
+            const waitlistNote = isWaitlist 
+                ? `<div class="bg-orange-50 border-2 border-orange-200 p-4 rounded-xl mb-4">
+                    <p class="text-orange-700 font-bold">⚠️ キャンセル待ち予約です</p>
+                    <p class="text-orange-600 text-sm mt-1">キャンセルが発生した場合、担当者からご連絡いたします。</p>
+                   </div>` 
+                : '';
+            
             // 新しいB-06画面を作成
             const screen = document.createElement('div');
             screen.id = 'screen-b06';
             screen.className = 'screen p-8 text-center flex flex-col justify-center min-h-[60vh]';
             screen.innerHTML = `
-                <div class="text-6xl mb-6">✅</div>
-                <h2 class="text-2xl font-bold mb-8">予約を受け付けました</h2>
+                <div class="text-6xl mb-6">${icon}</div>
+                <h2 class="text-2xl font-bold mb-8">${heading}</h2>
                 
+                ${waitlistNote}
+
                 <div class="bg-blue-50 border-2 border-blue-100 p-6 rounded-xl text-left w-full mb-6 space-y-4">
                     <p class="text-base leading-relaxed">
                         弊社が確認後、LINEにて、予約確定通知をお送りいたします。担当者からの連絡をお待ちください。

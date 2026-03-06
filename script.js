@@ -14,6 +14,7 @@ let currentAuthToken = null;
 let cachedTours = [];
 let cachedReservations = [];
 let cachedPickups = [];
+let cachedWaitlist = [];
 
 function getAuthHeaders() {
     return { Authorization: `Bearer ${currentAuthToken}` };
@@ -59,12 +60,14 @@ function normalizeReservation(reservation) {
         amount: Number(reservation.amount ?? reservation.totalPrice ?? 0),
         status: reservation.status || 'confirmed',
         pickup: reservation.pickup || firstPickup,
-        seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし')
+        seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし'),
+        createdAt: reservation.createdAt || ''
     };
 }
 
 function getStatusMeta(statusKey) {
     if (statusKey === 'cancelled') return { label: 'キャンセル', className: 'text-red-600 bg-red-50' };
+    if (statusKey === 'waitlist') return { label: 'キャンセル待ち', className: 'text-orange-600 bg-orange-50' };
     return { label: '確定', className: 'text-green-600 bg-green-50' };
 }
 
@@ -179,14 +182,15 @@ async function loadInitialData() {
             { id: 'p4', name: '大宮駅 西口', sortOrder: 4, active: false }
         ];
     } else {
-        const [resTours, resPick, resConfirmed, resCancelled] = await Promise.all([
+        const [resTours, resPick, resConfirmed, resCancelled, resWaitlist] = await Promise.all([
             fetch(`${API_BASE_URL}/tours`, { headers: getAuthHeaders() }),
             fetch(`${API_BASE_URL}/pickups`, { headers: getAuthHeaders() }),
             fetch(`${API_BASE_URL}/reservations?status=confirmed`, { headers: getAuthHeaders() }),
-            fetch(`${API_BASE_URL}/reservations?status=cancelled`, { headers: getAuthHeaders() })
+            fetch(`${API_BASE_URL}/reservations?status=cancelled`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/reservations?status=waitlist`, { headers: getAuthHeaders() })
         ]);
 
-        if (!resTours.ok || !resPick.ok || !resConfirmed.ok || !resCancelled.ok) {
+        if (!resTours.ok || !resPick.ok || !resConfirmed.ok || !resCancelled.ok || !resWaitlist.ok) {
             throw new Error('API request failed');
         }
 
@@ -194,6 +198,7 @@ async function loadInitialData() {
         const pickupsData = await resPick.json();
         const reservationsConfirmedData = await resConfirmed.json();
         const reservationsCancelledData = await resCancelled.json();
+        const reservationsWaitlistData = await resWaitlist.json();
 
         cachedTours = (Array.isArray(toursData) ? toursData : []).map(normalizeTour);
 
@@ -205,6 +210,11 @@ async function loadInitialData() {
             : (Array.isArray(reservationsCancelledData.reservations) ? reservationsCancelledData.reservations : []);
 
         cachedReservations = [...reservationArrayConfirmed, ...reservationArrayCancelled].map(normalizeReservation);
+
+        const reservationArrayWaitlist = Array.isArray(reservationsWaitlistData)
+            ? reservationsWaitlistData
+            : (Array.isArray(reservationsWaitlistData.reservations) ? reservationsWaitlistData.reservations : []);
+        cachedWaitlist = reservationArrayWaitlist.map(normalizeReservation);
 
         cachedPickups = (Array.isArray(pickupsData) ? pickupsData : []).map(normalizePickup);
     }
@@ -235,12 +245,13 @@ function switchTab(tabId) {
     document.getElementById('view-' + tabId).classList.remove('hidden');
 
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active-nav'));
-    const navMap = { 'reservations': 0, 'tours': 1, 'pickups': 2 };
+    const navMap = { 'reservations': 0, 'tours': 1, 'pickups': 2, 'waitlist': 3 };
     document.querySelectorAll('.nav-item')[navMap[tabId]].classList.add('active-nav');
 
     if (tabId === 'reservations') loadReservations();
     if (tabId === 'tours') loadTours();
     if (tabId === 'pickups') loadPickups();
+    if (tabId === 'waitlist') loadWaitlist();
 }
 
 function openModal(modalId) {
@@ -280,7 +291,11 @@ function downloadCSV() {
     const filterDate = document.getElementById('filter-date').value;
     const filterStatus = document.getElementById('filter-status').value;
 
-    let filtered = cachedReservations.filter(function(r) {
+    const allReservationsCSV = filterStatus === 'all' || filterStatus === 'waitlist'
+        ? [...cachedReservations, ...cachedWaitlist]
+        : cachedReservations;
+
+    let filtered = allReservationsCSV.filter(function(r) {
         const matchTour = !filterTourId || r.tour_id === filterTourId;
         const matchDate = !filterDate || r.date === filterDate;
         const matchStatus = filterStatus === 'all' || r.status === filterStatus;
@@ -289,7 +304,7 @@ function downloadCSV() {
 
     const headers = ['ツアー日', 'ツアー名', '氏名', 'LINE表示名', '電話番号', '住所', '人数', '乗車地', '前列座席', '金額', 'ステータス', '進捗'];
     const rows = filtered.map(function(r) {
-        const statusLabel = r.status === 'cancelled' ? 'キャンセル' : '確定';
+        const statusLabel = r.status === 'cancelled' ? 'キャンセル' : r.status === 'waitlist' ? 'キャンセル待ち' : '確定';
         const progressLabel = r.progressStatus === 'middle' ? '中間' : r.progressStatus === 'final' ? '最終' : '発送';
         return [
             r.date,
@@ -332,7 +347,12 @@ function loadReservations() {
     const filterDate = document.getElementById('filter-date').value;
     const filterStatus = document.getElementById('filter-status').value;
 
-    let filtered = cachedReservations.filter(function(r) {
+    // waitlistフィルター選択時はcachedWaitlistも含める
+    const allReservations = filterStatus === 'all' || filterStatus === 'waitlist'
+        ? [...cachedReservations, ...cachedWaitlist]
+        : cachedReservations;
+
+    let filtered = allReservations.filter(function(r) {
         const matchTour = !filterTourId || r.tour_id === filterTourId;
         const matchDate = !filterDate || r.date === filterDate;
         const matchStatus = filterStatus === 'all' || r.status === filterStatus;
@@ -382,7 +402,7 @@ function loadReservations() {
 
 // 予約詳細モーダル
 function showReservationDetail(id) {
-    const r = cachedReservations.find(function(x) { return x.id === id; });
+    const r = cachedReservations.find(function(x) { return x.id === id; }) || cachedWaitlist.find(function(x) { return x.id === id; });
     if (!r) return;
     
     const statusMeta = getStatusMeta(r.status);
@@ -589,6 +609,13 @@ function loadTours() {
             return p ? p.name : pid;
         }).join(', ');
 
+        // キャンセル待ち人数を集計
+        const waitlistForTour = cachedWaitlist.filter(function(w) { return w.tour_id === t.id; });
+        const waitlistCount = waitlistForTour.reduce(function(sum, w) { return sum + w.count; }, 0);
+        const waitlistLine = waitlistCount > 0 
+            ? '<div class="flex justify-between mb-1"><span class="text-orange-600">キャンセル待ち:</span><span class="font-bold text-orange-600">' + waitlistCount + '名</span></div>'
+            : '';
+
         div.innerHTML = ''
             + '<div class="flex justify-between items-start mb-2">'
             + '<span class="text-xs font-bold px-2 py-1 rounded ' + statusColor + '">' + t.status.toUpperCase() + '</span>'
@@ -598,6 +625,7 @@ function loadTours() {
             + '<p class="text-xs text-gray-500 mb-2">' + (pickupNames ? '乗車地: ' + pickupNames : '乗車地: 未設定') + '</p>'
             + '<div class="mt-auto pt-4 border-t border-gray-100 text-sm">'
             + '<div class="flex justify-between mb-1"><span>予約数:</span><span class="font-bold">' + (t.current || 0) + ' / ' + t.capacity + '</span></div>'
+            + waitlistLine
             + '<div class="flex justify-between mb-3"><span>料金:</span><span>¥' + t.price.toLocaleString() + '</span></div>'
             + '<div class="flex gap-2">'
             + '<button onclick="editTour(\'' + t.id + '\')" class="flex-1 bg-gray-100 hover:bg-gray-200 py-2 rounded font-bold text-gray-700 text-sm">編集</button>'
@@ -915,5 +943,131 @@ async function deletePickup(id) {
             console.error(err);
             alert('通信エラーが発生しました');
         }
+    }
+}
+
+// ==========================================
+// 7. キャンセル待ち管理
+// ==========================================
+function populateFilterWaitlistTourDropdown() {
+    const select = document.getElementById('filter-waitlist-tour');
+    if (!select) return;
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">すべてのツアー</option>';
+    cachedTours.forEach(function(t) {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.date + ' ： ' + t.title;
+        select.appendChild(opt);
+    });
+    select.value = currentVal;
+}
+
+function loadWaitlist() {
+    populateFilterWaitlistTourDropdown();
+    
+    const filterTourId = document.getElementById('filter-waitlist-tour').value;
+
+    let filtered = cachedWaitlist.filter(function(r) {
+        const matchTour = !filterTourId || r.tour_id === filterTourId;
+        return matchTour;
+    });
+
+    // 申込日時順にソート（新しい順）
+    filtered.sort(function(a, b) {
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+
+    let totalPeople = 0;
+    filtered.forEach(function(r) {
+        totalPeople += r.count;
+    });
+    document.getElementById('waitlist-summary-count').innerText = totalPeople + '名';
+
+    const tbody = document.getElementById('waitlist-table-body');
+    tbody.innerHTML = '';
+    
+    if (filtered.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="8" class="p-6 text-center text-gray-400">キャンセル待ちの予約はありません</td>';
+        tbody.appendChild(tr);
+        return;
+    }
+
+    filtered.forEach(function(r) {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-orange-50';
+        
+        const createdAt = r.createdAt ? new Date(r.createdAt).toLocaleString('ja-JP') : '-';
+        
+        tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
+            + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + r.tour_name + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.phone || '-') + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + createdAt + '</td>'
+            + '<td class="p-3 lg:p-4 border-b space-x-1 whitespace-nowrap">'
+            + '<button onclick="event.stopPropagation(); showReservationDetail(\'' + r.id + '\')" class="text-blue-600 underline text-xs lg:text-sm">詳細</button>'
+            + ' <button onclick="event.stopPropagation(); confirmWaitlistReservation(\'' + r.id + '\')" class="text-green-600 underline text-xs lg:text-sm">確定</button>'
+            + ' <button onclick="event.stopPropagation(); cancelWaitlistReservation(\'' + r.id + '\')" class="text-red-600 underline text-xs lg:text-sm">取消</button>'
+            + '</td>';
+        tbody.appendChild(tr);
+    });
+}
+
+async function confirmWaitlistReservation(id) {
+    if (!confirm('このキャンセル待ち予約を「確定」に変更しますか？')) return;
+    
+    try {
+        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+            method: 'PATCH',
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'confirmed' })
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            alert(errorBody.error || 'ステータス更新に失敗しました');
+            return;
+        }
+
+        await loadInitialData();
+        switchTab('waitlist');
+        alert('キャンセル待ち予約を確定しました');
+    } catch (err) {
+        console.error(err);
+        alert('通信エラーが発生しました');
+    }
+}
+
+async function cancelWaitlistReservation(id) {
+    if (!confirm('このキャンセル待ち予約をキャンセルしますか？')) return;
+    
+    try {
+        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+            method: 'PATCH',
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'cancelled' })
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            alert(errorBody.error || 'ステータス更新に失敗しました');
+            return;
+        }
+
+        await loadInitialData();
+        switchTab('waitlist');
+        alert('キャンセル待ち予約を取り消しました');
+    } catch (err) {
+        console.error(err);
+        alert('通信エラーが発生しました');
     }
 }

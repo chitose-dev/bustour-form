@@ -79,6 +79,11 @@
                             <i class="fa-solid fa-map-location-dot"></i> 乗車地管理
                         </button>
                     </li>
+                    <li>
+                        <button onclick="switchTab('waitlist'); closeSidebarMobile()" class="nav-item w-full text-left px-6 py-4 hover:bg-gray-700 transition flex items-center gap-3">
+                            <i class="fa-solid fa-clock-rotate-left"></i> キャンセル待ち
+                        </button>
+                    </li>
                 </ul>
             </nav>
 
@@ -114,6 +119,7 @@
                                 <option value="all">全て</option>
                                 <option value="confirmed">確定 (confirmed)</option>
                                 <option value="cancelled">キャンセル (cancelled)</option>
+                                <option value="waitlist">キャンセル待ち (waitlist)</option>
                             </select>
                         </div>
                         <button onclick="loadReservations()" class="bg-gray-800 text-white font-bold py-2 px-4 rounded hover:bg-gray-700 sm:col-span-2 lg:col-span-3">
@@ -205,6 +211,52 @@
                         </thead>
                         <tbody id="pickups-table-body" class="divide-y">
                             </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="view-waitlist" class="content-view p-4 lg:p-8 hidden">
+                <h2 class="text-xl lg:text-2xl font-bold mb-4 lg:mb-6 flex items-center gap-2">
+                    <span class="bg-orange-400 w-2 h-8 rounded"></span> キャンセル待ち一覧
+                </h2>
+
+                <div class="bg-white p-4 lg:p-6 rounded-lg shadow-sm mb-4 lg:mb-6 border border-gray-200">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4 items-end">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-600 mb-1">ツアー名</label>
+                            <select id="filter-waitlist-tour" class="w-full border p-2 rounded bg-white" onchange="loadWaitlist()">
+                                <option value="">すべてのツアー</option>
+                            </select>
+                        </div>
+                        <button onclick="loadWaitlist()" class="bg-gray-800 text-white font-bold py-2 px-4 rounded hover:bg-gray-700">
+                            <i class="fa-solid fa-filter"></i> 絞り込み
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3 lg:gap-4 mb-4 lg:mb-6">
+                    <div class="bg-orange-500 text-white p-3 lg:p-4 rounded-lg shadow-md flex-1">
+                        <p class="text-sm opacity-80">キャンセル待ち人数</p>
+                        <p class="text-2xl lg:text-3xl font-bold" id="waitlist-summary-count">0名</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow overflow-x-auto border border-gray-200">
+                    <table class="w-full text-left border-collapse min-w-[700px]">
+                        <thead class="bg-orange-50 border-b-2 border-orange-200">
+                            <tr>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ツアー日</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ツアー名</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">氏名</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">LINE表示名</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">人数</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">電話番号</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">申込日時</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="waitlist-table-body" class="divide-y divide-gray-100">
+                        </tbody>
                     </table>
                 </div>
             </section>
