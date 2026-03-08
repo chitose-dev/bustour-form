@@ -424,6 +424,11 @@ function loadReservations() {
         return matchTour && matchDate && matchStatus;
     });
 
+    // 作成日時の新しい順にソート
+    filtered.sort(function(a, b) {
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+
     let totalPeople = 0;
     let totalSales = 0;
     filtered.forEach(function(r) {
@@ -666,7 +671,12 @@ function loadTours() {
     const grid = document.getElementById('tours-grid');
     grid.innerHTML = '';
 
-    cachedTours.forEach(function(t) {
+    // 実施日が遠い順にソート
+    var sortedTours = cachedTours.slice().sort(function(a, b) {
+        return (b.date || '').localeCompare(a.date || '');
+    });
+
+    sortedTours.forEach(function(t) {
         const div = document.createElement('div');
         div.className = "bg-white rounded-lg shadow border border-gray-200 p-4 flex flex-col relative";
         

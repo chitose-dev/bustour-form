@@ -298,3 +298,38 @@ def cleanup_old_cancelled_reservations(months=3):
     except Exception as e:
         print(f"キャンセル予約クリーンアップエラー: {e}")
         return 0
+
+def cleanup_past_waitlist():
+    """ツアー実施日を過ぎたキャンセル待ち予約を自動削除"""
+    today = datetime.now().strftime('%Y-%m-%d')
+    deleted_count = 0
+    try:
+        waitlist_docs = db.collection('reservations').where('status', '==', 'waitlist').stream()
+        
+        batch = db.batch()
+        batch_count = 0
+        
+        for doc in waitlist_docs:
+            data = doc.to_dict()
+            tour_date = data.get('date', '')
+            if tour_date and tour_date < today:
+                batch.delete(doc.reference)
+                batch_count += 1
+                deleted_count += 1
+                
+                if batch_count >= 500:
+                    batch.commit()
+                    batch = db.batch()
+                    batch_count = 0
+        
+        if batch_count > 0:
+            batch.commit()
+        
+        if deleted_count > 0:
+            print(f"期限切れキャンセル待ちを削除: {deleted_count}件")
+        
+        return deleted_count
+    
+    except Exception as e:
+        print(f"キャンセル待ちクリーンアップエラー: {e}")
+        return 0
