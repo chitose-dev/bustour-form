@@ -696,6 +696,12 @@ async function _submitTourInner() {
     
     const pickupIds = Array.from(document.querySelectorAll('.tour-pickup-cb:checked')).map(function(cb) { return cb.value; });
 
+    // 締切日が開催日より後ならエラー
+    if (deadline > date) {
+        alert('締切日は開催日より前の日付を設定してください。');
+        return;
+    }
+
     // 新規作成時の重複チェック（同じタイトル＋同じ日付）
     if (!id) {
         const dup = cachedTours.find(function(t) { return t.title === title && t.date === date; });
