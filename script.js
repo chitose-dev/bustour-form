@@ -285,6 +285,10 @@ function openModal(modalId) {
 
 function closeModal(modalId) {
     document.getElementById(modalId).classList.add('hidden');
+    if (modalId === 'modal-tour-editor') {
+        document.getElementById('form-tour-editor').reset();
+        document.getElementById('edit-tour-id').value = '';
+    }
 }
 
 // CSVダウンロード
