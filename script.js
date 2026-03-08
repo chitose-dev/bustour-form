@@ -304,15 +304,16 @@ function downloadCSV() {
         return matchTour && matchDate && matchStatus;
     });
 
-    const headers = ['ツアー日', 'ツアー名', '氏名', 'LINE表示名', '電話番号', '住所', '人数', '乗車地', '前列座席', '金額', 'ステータス', '進捗'];
+    const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '人数', '乗車地', '前列座席', '金額', 'ステータス', '進捗'];
     const rows = filtered.map(function(r) {
         const statusLabel = r.status === 'cancelled' ? 'キャンセル' : r.status === 'waitlist' ? 'キャンセル待ち' : '確定';
         const progressLabel = r.progressStatus === 'middle' ? '中間' : r.progressStatus === 'final' ? '最終' : '発送';
+        const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
+        const tourName = tourObj ? tourObj.title : r.tour_name;
         return [
             r.date,
-            r.tour_name,
+            tourName,
             r.name,
-            r.lineDisplayName || '',
             r.phone || '',
             r.address || '',
             r.count,
@@ -379,11 +380,13 @@ function loadReservations() {
         tr.className = 'cursor-pointer hover:bg-gray-50';
         const statusMeta = getStatusMeta(r.status);
         const progressMeta = getProgressMeta(r.progressStatus);
+        // ツアー名はcachedToursから最新を取得
+        const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
+        const tourName = tourObj ? tourObj.title : r.tour_name;
 
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
-            + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + r.tour_name + '</td>'
+            + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + tourName + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.pickup || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
@@ -409,17 +412,20 @@ function showReservationDetail(id) {
     
     const statusMeta = getStatusMeta(r.status);
     const progressMeta = getProgressMeta(r.progressStatus);
+    // ツアー名はcachedToursから最新を取得
+    const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
+    const tourName = tourObj ? tourObj.title : r.tour_name;
     
     const body = document.getElementById('reservation-detail-body');
     body.innerHTML = ''
         + '<div class="bg-gray-50 rounded-lg p-4 space-y-3 border">'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">状態</span><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></div>'
         + '<hr>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">ツアー名</span><span class="font-bold text-sm text-right max-w-[60%]">' + r.tour_name + '</span></div>'
+        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">ツアー名</span><span class="font-bold text-sm text-right max-w-[60%]">' + tourName + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">ツアー日</span><span class="font-bold text-sm">' + r.date + '</span></div>'
         + '<hr>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">氏名</span><span class="font-bold text-sm">' + r.name + '</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">LINE表示名</span><span class="font-bold text-sm text-gray-500">' + (r.lineDisplayName || '-') + '</span></div>'
+        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">LINE ID</span><span class="font-bold text-sm text-gray-500 break-all">' + (r.lineUserId || '-') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">電話番号</span><span class="font-bold text-sm">' + (r.phone || '-') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">住所</span><span class="font-bold text-sm text-right max-w-[60%]">' + (r.address || '-') + '</span></div>'
         + '<hr>'
@@ -602,9 +608,10 @@ function loadTours() {
         div.className = "bg-white rounded-lg shadow border border-gray-200 p-4 flex flex-col relative";
         
         let statusColor = 'bg-green-100 text-green-800';
-        if (t.status === 'full') statusColor = 'bg-red-100 text-red-800';
-        if (t.status === 'stop') statusColor = 'bg-gray-200 text-gray-800';
-        if (t.status === 'hidden') statusColor = 'bg-yellow-100 text-yellow-800';
+        let statusLabel = '受付中';
+        if (t.status === 'full') { statusColor = 'bg-red-100 text-red-800'; statusLabel = '満席'; }
+        if (t.status === 'stop') { statusColor = 'bg-gray-200 text-gray-800'; statusLabel = '受付停止'; }
+        if (t.status === 'hidden') { statusColor = 'bg-yellow-100 text-yellow-800'; statusLabel = '非表示'; }
 
         const pickupNames = (t.pickupIds || []).map(function(pid) {
             const p = cachedPickups.find(function(x) { return x.id === pid; });
@@ -620,7 +627,7 @@ function loadTours() {
 
         div.innerHTML = ''
             + '<div class="flex justify-between items-start mb-2">'
-            + '<span class="text-xs font-bold px-2 py-1 rounded ' + statusColor + '">' + t.status.toUpperCase() + '</span>'
+            + '<span class="text-xs font-bold px-2 py-1 rounded ' + statusColor + '">' + statusLabel + '</span>'
             + '<span class="text-gray-500 text-sm">' + t.date + '</span>'
             + '</div>'
             + '<h3 class="font-bold text-lg mb-2 line-clamp-2">' + t.title + '</h3>'
@@ -670,7 +677,13 @@ function editTour(id) {
     openModal('modal-tour-editor');
 }
 
+let _submitTourBusy = false;
 async function submitTour() {
+    if (_submitTourBusy) return;
+    _submitTourBusy = true;
+    try { await _submitTourInner(); } finally { _submitTourBusy = false; }
+}
+async function _submitTourInner() {
     const id = document.getElementById('edit-tour-id').value;
     const title = document.getElementById('edit-tour-title').value;
     const date = document.getElementById('edit-tour-date').value;
@@ -682,6 +695,15 @@ async function submitTour() {
     const imageUrl = document.getElementById('edit-tour-img').value;
     
     const pickupIds = Array.from(document.querySelectorAll('.tour-pickup-cb:checked')).map(function(cb) { return cb.value; });
+
+    // 新規作成時の重複チェック（同じタイトル＋同じ日付）
+    if (!id) {
+        const dup = cachedTours.find(function(t) { return t.title === title && t.date === date; });
+        if (dup) {
+            alert('同じツアー名・同じ開催日のツアーが既に存在します。');
+            return;
+        }
+    }
 
     if (USE_MOCK) {
         if (id) {
@@ -890,6 +912,13 @@ async function addPickup() {
     
     if (!name) {
         alert('乗車地名を入力してください');
+        return;
+    }
+
+    // 重複チェック
+    const dup = cachedPickups.find(function(p) { return p.name === name; });
+    if (dup) {
+        alert('「' + name + '」は既に登録されています。');
         return;
     }
     

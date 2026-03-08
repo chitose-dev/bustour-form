@@ -117,9 +117,9 @@
                             <label class="block text-sm font-bold text-gray-600 mb-1">ステータス</label>
                             <select id="filter-status" class="w-full border p-2 rounded" onchange="loadReservations()">
                                 <option value="all">全て</option>
-                                <option value="confirmed">確定 (confirmed)</option>
-                                <option value="cancelled">キャンセル (cancelled)</option>
-                                <option value="waitlist">キャンセル待ち (waitlist)</option>
+                                <option value="confirmed">確定</option>
+                                <option value="cancelled">キャンセル</option>
+                                <option value="waitlist">キャンセル待ち</option>
                             </select>
                         </div>
                         <button onclick="loadReservations()" class="bg-gray-800 text-white font-bold py-2 px-4 rounded hover:bg-gray-700 sm:col-span-2 lg:col-span-3">
@@ -155,7 +155,6 @@
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ツアー日</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">ツアー名</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">氏名</th>
-                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">LINE表示名</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">人数</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">乗車地</th>
                                 <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">前列</th>
@@ -365,10 +364,10 @@
                         <div>
                             <label class="block font-bold text-sm mb-1">ステータス</label>
                             <select id="edit-tour-status" class="w-full border p-2 rounded">
-                                <option value="open">受付中 (open)</option>
-                                <option value="full">満席 (full)</option>
-                                <option value="stop">停止 (stop)</option>
-                                <option value="hidden">非表示 (hidden)</option>
+                                <option value="open">受付中</option>
+                                <option value="full">満席</option>
+                                <option value="stop">受付停止</option>
+                                <option value="hidden">非表示</option>
                             </select>
                         </div>
                     </div>
