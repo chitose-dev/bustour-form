@@ -701,6 +701,15 @@ async function _submitTourInner() {
     
     const pickupIds = Array.from(document.querySelectorAll('.tour-pickup-cb:checked')).map(function(cb) { return cb.value; });
 
+    // 新規作成時は過去日付を禁止
+    if (!id) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (date < today) {
+            alert('過去の日付でツアーを作成することはできません。');
+            return;
+        }
+    }
+
     // 締切日が開催日より後ならエラー
     if (deadline > date) {
         alert('締切日は開催日より前の日付を設定してください。');
