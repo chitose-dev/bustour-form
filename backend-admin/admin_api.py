@@ -36,6 +36,55 @@ def login():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@require_auth
+def change_password():
+    """
+    POST /api/admin/change-password
+    {currentPassword, newPassword}
+    """
+    try:
+        data = request.get_json()
+        current_password = data.get('currentPassword')
+        new_password = data.get('newPassword')
+
+        if not current_password or not new_password:
+            return jsonify({'error': 'missing_fields'}), 400
+
+        if not validate_password(current_password):
+            return jsonify({'error': 'invalid_current_password'}), 401
+
+        if len(new_password) < 4:
+            return jsonify({'error': 'password_too_short'}), 400
+
+        from auth import hash_password
+        import subprocess
+        new_hash = hash_password(new_password)
+
+        # Cloud Run の環境変数を更新
+        try:
+            subprocess.run([
+                'gcloud', 'run', 'services', 'update', 'backend-admin',
+                '--region', 'asia-northeast1',
+                '--update-env-vars', f'ADMIN_PASSWORD_HASH={new_hash}',
+                '--quiet'
+            ], check=True, timeout=60)
+        except Exception as deploy_err:
+            print(f"gcloud update failed: {deploy_err}")
+            # gcloud が使えない場合はFirestoreにも保存しておく
+            from db import db as firestore_db
+            firestore_db.collection('settings').document('admin').set(
+                {'password_hash': new_hash}, merge=True
+            )
+
+        # 現在のプロセスでも即座に反映
+        import auth
+        auth.ADMIN_PASSWORD_HASH = new_hash
+
+        return jsonify({'message': 'password_changed'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ---------------------------------
 # 予約管理
 # ---------------------------------

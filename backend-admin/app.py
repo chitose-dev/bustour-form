@@ -3,7 +3,7 @@ import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from admin_api import (
-    login, get_reservations_api, update_reservation_api, create_reservation_api,
+    login, change_password, get_reservations_api, update_reservation_api, create_reservation_api,
     get_tours_api, create_tour_api, update_tour_api, delete_tour_api,
     get_pickups_api, create_pickup_api, update_pickup_api, delete_pickup_api,
     upload_image_api
@@ -19,6 +19,10 @@ CORS(app)
 @app.route('/api/admin/login', methods=['POST'])
 def login_route():
     return login()
+
+@app.route('/api/admin/change-password', methods=['POST'])
+def change_password_route():
+    return change_password()
 
 # ---------------------------------
 # 予約エンドポイント

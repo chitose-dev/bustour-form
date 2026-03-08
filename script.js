@@ -60,6 +60,7 @@ function normalizeReservation(reservation) {
         amount: Number(reservation.amount ?? reservation.totalPrice ?? 0),
         status: reservation.status || 'confirmed',
         pickup: reservation.pickup || firstPickup,
+        pickups: pickups,
         seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし'),
         createdAt: reservation.createdAt || ''
     };
@@ -75,6 +76,14 @@ function getProgressMeta(progressKey) {
     if (progressKey === 'middle') return { label: '中間', className: 'text-blue-600 bg-blue-50' };
     if (progressKey === 'final') return { label: '最終', className: 'text-purple-600 bg-purple-50' };
     return { label: '発送', className: 'text-green-600 bg-green-50' };
+}
+
+function formatPickupsDisplay(r) {
+    var pickups = Array.isArray(r.pickups) ? r.pickups.filter(Boolean) : [];
+    if (pickups.length === 0) return r.pickup || '-';
+    var unique = pickups.filter(function(v, i, a) { return a.indexOf(v) === i; });
+    if (unique.length === 1) return unique[0];
+    return pickups.join(', ');
 }
 
 // ==========================================
@@ -245,13 +254,62 @@ function switchTab(tabId) {
     document.getElementById('view-' + tabId).classList.remove('hidden');
 
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active-nav'));
-    const navMap = { 'reservations': 0, 'tours': 1, 'pickups': 2, 'waitlist': 3 };
+    const navMap = { 'reservations': 0, 'tours': 1, 'pickups': 2, 'waitlist': 3, 'settings': 4 };
     document.querySelectorAll('.nav-item')[navMap[tabId]].classList.add('active-nav');
 
     if (tabId === 'reservations') loadReservations();
     if (tabId === 'tours') loadTours();
     if (tabId === 'pickups') loadPickups();
     if (tabId === 'waitlist') loadWaitlist();
+}
+
+async function changePassword() {
+    const currentPw = document.getElementById('current-password').value;
+    const newPw = document.getElementById('new-password').value;
+    const confirmPw = document.getElementById('new-password-confirm').value;
+    const msgEl = document.getElementById('password-change-message');
+    const btn = document.getElementById('btn-change-password');
+
+    msgEl.classList.add('hidden');
+
+    if (newPw !== confirmPw) {
+        msgEl.textContent = '新しいパスワードが一致しません';
+        msgEl.className = 'text-sm mt-3 text-center text-red-600';
+        msgEl.classList.remove('hidden');
+        return;
+    }
+    if (newPw.length < 4) {
+        msgEl.textContent = 'パスワードは4文字以上にしてください';
+        msgEl.className = 'text-sm mt-3 text-center text-red-600';
+        msgEl.classList.remove('hidden');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '変更中...';
+    try {
+        const res = await fetch(API_BASE_URL + '/change-password', {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            msgEl.textContent = 'パスワードを変更しました';
+            msgEl.className = 'text-sm mt-3 text-center text-green-600 font-bold';
+            document.getElementById('form-change-password').reset();
+        } else {
+            msgEl.textContent = data.error === 'invalid_current_password' ? '現在のパスワードが正しくありません' : 'パスワード変更に失敗しました';
+            msgEl.className = 'text-sm mt-3 text-center text-red-600';
+        }
+    } catch (err) {
+        msgEl.textContent = '通信エラーが発生しました';
+        msgEl.className = 'text-sm mt-3 text-center text-red-600';
+    } finally {
+        msgEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-key mr-1"></i> パスワードを変更';
+    }
 }
 
 function openModal(modalId) {
@@ -435,7 +493,7 @@ function showReservationDetail(id) {
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">住所</span><span class="font-bold text-sm text-right max-w-[60%]">' + (r.address || '-') + '</span></div>'
         + '<hr>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">人数</span><span class="font-bold text-sm">' + r.count + '名</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">乗車地</span><span class="font-bold text-sm">' + (r.pickup || '-') + '</span></div>'
+        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">乗車地</span><span class="font-bold text-sm text-right max-w-[60%]">' + formatPickupsDisplay(r) + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">前列座席</span><span class="font-bold text-sm">' + (r.seat_pref || '-') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">備考</span><span class="font-bold text-sm text-right max-w-[60%]"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></span></div>'
         + '<hr>'
@@ -615,6 +673,7 @@ function loadTours() {
         let statusColor = 'bg-green-100 text-green-800';
         let statusLabel = '受付中';
         if (t.status === 'full') { statusColor = 'bg-red-100 text-red-800'; statusLabel = '満席'; }
+        if (t.status === 'waitlist_open') { statusColor = 'bg-orange-100 text-orange-800'; statusLabel = 'キャンセル待ち受付'; }
         if (t.status === 'stop') { statusColor = 'bg-gray-200 text-gray-800'; statusLabel = '受付停止'; }
         if (t.status === 'hidden') { statusColor = 'bg-yellow-100 text-yellow-800'; statusLabel = '非表示'; }
 

@@ -11,6 +11,17 @@ JWT_ALGORITHM = 'HS256'
 # 例: echo -n "admin" | shasum -a 256 → 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
 ADMIN_PASSWORD_HASH = os.getenv('ADMIN_PASSWORD_HASH', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918')
 
+# Firestoreに保存されたパスワードハッシュがあればそちらを優先
+try:
+    from db import db as _firestore_db
+    _settings_doc = _firestore_db.collection('settings').document('admin').get()
+    if _settings_doc.exists:
+        _stored_hash = _settings_doc.to_dict().get('password_hash')
+        if _stored_hash:
+            ADMIN_PASSWORD_HASH = _stored_hash
+except Exception:
+    pass
+
 def hash_password(password):
     """パスワードをSHA256でハッシュ化"""
     return hashlib.sha256(password.encode('utf-8')).hexdigest()

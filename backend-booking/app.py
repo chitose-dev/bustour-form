@@ -206,21 +206,21 @@ def get_calendar():
                     
                     if deadline and deadline < today.strftime('%Y-%m-%d'):
                         continue  # 締切超過
-                    if status != 'open':
-                        continue  # openではない
+                    if status not in ('open', 'waitlist_open'):
+                        continue  # open/waitlist_open以外はスキップ
                     
                     has_open = True
                     break
                 
                 if not has_open:
-                    # fullだがキャンセル待ち枠が残っているツアーがあるかチェック
+                    # waitlist_openでキャンセル待ち枠が残っているツアーがあるかチェック
                     has_waitlist_available = False
                     for tour in tour_by_date[date_str]:
                         t_deadline = tour.get('deadline_date')
                         t_status = tour.get('status', 'open')
                         if t_deadline and t_deadline < today.strftime('%Y-%m-%d'):
                             continue
-                        if t_status == 'full':
+                        if t_status == 'waitlist_open':
                             t_id = tour.get('id')
                             wl_count = waitlist_by_tour.get(t_id, 0)
                             if wl_count < WAITLIST_MAX:
@@ -239,7 +239,7 @@ def get_calendar():
                         
                         if deadline and deadline < today.strftime('%Y-%m-%d'):
                             reason = 'deadline_passed'
-                        elif status == 'full':
+                        elif status in ('full', 'waitlist_open'):
                             reason = 'full'
                         elif status == 'stop':
                             reason = 'stop'
@@ -282,7 +282,7 @@ def get_tours():
             tour_id = tour_doc.id
 
             status = tour_data.get('status')
-            if status not in ['open', 'full']:
+            if status not in ['open', 'full', 'waitlist_open']:
                 continue
 
             start_date, end_date = get_tour_range_dates(tour_data.get('date'), tour_data.get('deadline_date'))
@@ -314,7 +314,7 @@ def get_tours():
                 'current_count': current_count,
                 'waitlist_count': waitlist_count,
                 'waitlist_max': WAITLIST_MAX,
-                'waitlist_available': tour_data.get('status') == 'full' and waitlist_count < WAITLIST_MAX,
+                'waitlist_available': tour_data.get('status') == 'waitlist_open' and waitlist_count < WAITLIST_MAX,
                 'pickupIds': tour_data.get('pickupIds', [])
             })
         
@@ -490,12 +490,12 @@ def create_reservation():
             if deadline_date and deadline_date < today:
                 raise ValueError('Booking deadline passed')
             
-            # 3. ステータスチェック（open または full でキャンセル待ち枠あり）
+            # 3. ステータスチェック
             is_waitlist = False
             if status == 'open':
                 pass  # 通常予約
-            elif status == 'full':
-                # キャンセル待ち枠をチェック
+            elif status == 'waitlist_open':
+                # キャンセル待ち受付 → キャンセル待ち枠をチェック
                 waitlist_count = 0
                 for res_doc in db.collection('reservations').stream():
                     rd = res_doc.to_dict()

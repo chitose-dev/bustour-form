@@ -84,6 +84,11 @@
                             <i class="fa-solid fa-clock-rotate-left"></i> キャンセル待ち
                         </button>
                     </li>
+                    <li>
+                        <button onclick="switchTab('settings'); closeSidebarMobile()" class="nav-item w-full text-left px-6 py-4 hover:bg-gray-700 transition flex items-center gap-3">
+                            <i class="fa-solid fa-gear"></i> 設定
+                        </button>
+                    </li>
                 </ul>
             </nav>
 
@@ -260,6 +265,38 @@
                 </div>
             </section>
 
+            <section id="view-settings" class="content-view p-4 lg:p-8 hidden">
+                <h2 class="text-xl lg:text-2xl font-bold mb-4 lg:mb-6 flex items-center gap-2">
+                    <span class="bg-gray-600 w-2 h-8 rounded"></span> 設定
+                </h2>
+
+                <div class="bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-gray-200 max-w-md">
+                    <h3 class="font-bold mb-4 text-lg"><i class="fa-solid fa-lock mr-2"></i>パスワード変更</h3>
+                    <form id="form-change-password" onsubmit="event.preventDefault(); changePassword();">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block font-bold text-sm mb-1">現在のパスワード</label>
+                                <input type="password" id="current-password" class="w-full border-2 border-gray-300 p-2 rounded focus:border-primary outline-none" required>
+                            </div>
+                            <div>
+                                <label class="block font-bold text-sm mb-1">新しいパスワード</label>
+                                <input type="password" id="new-password" class="w-full border-2 border-gray-300 p-2 rounded focus:border-primary outline-none" required minlength="4">
+                            </div>
+                            <div>
+                                <label class="block font-bold text-sm mb-1">新しいパスワード（確認）</label>
+                                <input type="password" id="new-password-confirm" class="w-full border-2 border-gray-300 p-2 rounded focus:border-primary outline-none" required minlength="4">
+                            </div>
+                        </div>
+                        <div class="mt-6">
+                            <button type="submit" id="btn-change-password" class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-gray-700 transition">
+                                <i class="fa-solid fa-key mr-1"></i> パスワードを変更
+                            </button>
+                        </div>
+                        <p id="password-change-message" class="text-sm mt-3 text-center hidden"></p>
+                    </form>
+                </div>
+            </section>
+
         </main>
     </div>
 
@@ -366,6 +403,7 @@
                             <label class="block font-bold text-sm mb-1">ステータス</label>
                             <select id="edit-tour-status" class="w-full border p-2 rounded">
                                 <option value="open">受付中</option>
+                                <option value="waitlist_open">キャンセル待ち受付</option>
                                 <option value="full">満席</option>
                                 <option value="stop">受付停止</option>
                                 <option value="hidden">非表示</option>
