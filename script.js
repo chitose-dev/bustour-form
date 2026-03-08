@@ -387,6 +387,7 @@ function loadReservations() {
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + tourName + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.pickup || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
