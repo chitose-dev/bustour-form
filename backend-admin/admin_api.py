@@ -5,7 +5,8 @@ from db import (
     get_reservations_with_filters, get_reservation, update_reservation_status, create_manual_reservation,
     get_tours, get_tour, create_tour, update_tour, delete_tour,
     get_pickups, create_pickup, update_pickup, delete_pickup,
-    cleanup_old_cancelled_reservations, cleanup_past_waitlist
+    cleanup_old_cancelled_reservations, cleanup_past_waitlist,
+    set_special_member_for_reservation
 )
 from pricing import calculate_total_price, aggregate_reservations
 from line_api import send_cancellation_notification
@@ -133,25 +134,37 @@ def get_reservations_api():
 def update_reservation_api(reservation_id):
     """
     PATCH /api/admin/reservations/{id}
-    {status, progressStatus, remark}
+    {status, progressStatus, remark, specialMember}
     """
     try:
         data = request.get_json()
         new_status = data.get('status')
         progress_status = data.get('progressStatus')
         remark = data.get('remark')
+        special_member = data.get('specialMember')
 
-        if new_status is None and progress_status is None and remark is None:
-            return jsonify({'error': 'status or progressStatus or remark required'}), 400
+        if new_status is None and progress_status is None and remark is None and special_member is None:
+            return jsonify({'error': 'status or progressStatus or remark or specialMember required'}), 400
 
-        success = update_reservation_status(
-            reservation_id,
-            new_status=new_status,
-            progress_status=progress_status,
-            remark=remark
-        )
-        if not success:
-            return jsonify({'error': 'reservation not found'}), 404
+        if new_status is not None or progress_status is not None or remark is not None:
+            success = update_reservation_status(
+                reservation_id,
+                new_status=new_status,
+                progress_status=progress_status,
+                remark=remark
+            )
+            if not success:
+                return jsonify({'error': 'reservation not found'}), 404
+
+        updated_count = 0
+        if special_member is not None:
+            ok, err_code, updated_count = set_special_member_for_reservation(reservation_id, bool(special_member))
+            if not ok:
+                if err_code == 'reservation_not_found':
+                    return jsonify({'error': 'reservation not found'}), 404
+                if err_code == 'line_user_id_required':
+                    return jsonify({'error': 'lineUserId is required for special member'}), 400
+                return jsonify({'error': 'failed to update special member'}), 500
         
         # キャンセル時通知（オプション）
         if new_status == 'cancelled':
@@ -163,7 +176,7 @@ def update_reservation_api(reservation_id):
                     res_data.get('date')
                 )
         
-        return jsonify({'message': 'Reservation updated'}), 200
+        return jsonify({'message': 'Reservation updated', 'specialMemberUpdatedCount': updated_count}), 200
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

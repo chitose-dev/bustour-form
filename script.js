@@ -58,6 +58,8 @@ function normalizeReservation(reservation) {
         address: reservation.address || `${userInfo.pref || ''}${userInfo.city || ''}${userInfo.street || ''}`,
         count: Number(reservation.count ?? reservation.passengers ?? 0),
         amount: Number(reservation.amount ?? reservation.totalPrice ?? 0),
+        specialMember: !!reservation.specialMember,
+        memberDiscountTotal: Number(reservation.memberDiscountTotal ?? 0),
         status: reservation.status || 'confirmed',
         pickup: reservation.pickup || firstPickup,
         pickups: pickups,
@@ -451,9 +453,11 @@ function loadReservations() {
         const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
         const tourName = tourObj ? tourObj.title : r.tour_name;
 
+        const memberMark = r.specialMember ? ' <span class="text-xs text-blue-600 font-bold">★会員</span>' : '';
+
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm">' + tourName + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.pickup || '-') + '</td>'
@@ -502,7 +506,18 @@ function showReservationDetail(id) {
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">前列座席</span><span class="font-bold text-sm">' + (r.seat_pref || '-') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">備考</span><span class="font-bold text-sm text-right max-w-[60%]"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></span></div>'
         + '<hr>'
+        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">特別会員</span><span class="font-bold text-sm">' + (r.specialMember ? '適用中' : '未適用') + '</span></div>'
+        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">会員割引</span><span class="font-bold text-sm">-¥' + (r.memberDiscountTotal || 0).toLocaleString() + '</span></div>'
         + '<div class="flex justify-between items-center"><span class="text-gray-600 text-sm">合計金額</span><span class="font-bold text-lg text-red-600">¥' + r.amount.toLocaleString() + '</span></div>'
+        + '</div>'
+        + '<div class="mt-3 p-3 border rounded bg-white">'
+        + '<label class="flex items-center gap-2 text-sm font-bold">'
+        + '<input type="checkbox" id="detail-special-member" ' + (r.specialMember ? 'checked' : '') + ' ' + (!r.lineUserId ? 'disabled' : '') + '>'
+        + '<span>特別会員（1人あたり300円引き）</span>'
+        + '</label>'
+        + '<p class="text-xs text-gray-500 mt-1">チェックすると、この予約と同じLINE IDの今後予約にも割引を適用します</p>'
+        + (!r.lineUserId ? '<p class="text-xs text-red-500 mt-1">LINE IDが無い予約は特別会員登録できません</p>' : '')
+        + '<button onclick="updateSpecialMember(\'' + r.id + '\');" class="mt-2 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-2 rounded text-sm">会員設定を保存</button>'
         + '</div>'
         + (r.status === 'confirmed' ? '<div class="mt-4"><button onclick="updateReservationStatus(\'' + r.id + '\', \'cancelled\'); closeModal(\'modal-reservation-detail\')" class="w-full bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2 rounded-lg text-sm transition"><i class="fa-solid fa-ban mr-1"></i> この予約をキャンセルする</button></div>' : '');
     
@@ -573,6 +588,35 @@ async function updateReservationStatus(id, newStatus) {
             console.error(err);
             alert('通信エラーが発生しました');
         }
+    }
+}
+
+async function updateSpecialMember(id) {
+    const checkbox = document.getElementById('detail-special-member');
+    if (!checkbox) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+            method: 'PATCH',
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ specialMember: checkbox.checked })
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            alert(errorBody.error || '特別会員の更新に失敗しました');
+            return;
+        }
+
+        await loadInitialData();
+        showReservationDetail(id);
+        alert('特別会員設定を更新しました');
+    } catch (err) {
+        console.error(err);
+        alert('通信エラーが発生しました');
     }
 }
 
@@ -704,7 +748,7 @@ function loadTours() {
             + '<span class="text-xs font-bold px-2 py-1 rounded ' + statusColor + '">' + statusLabel + '</span>'
             + '<span class="text-gray-500 text-sm">' + t.date + '</span>'
             + '</div>'
-            + '<h3 class="font-bold text-lg mb-2 line-clamp-2">' + t.title + '</h3>'
+            + '<h3 class="font-bold text-lg mb-2 truncate lg:whitespace-normal lg:overflow-visible">' + t.title + '</h3>'
             + '<p class="text-xs text-gray-500 mb-2">' + (pickupNames ? '乗車地: ' + pickupNames : '乗車地: 未設定') + '</p>'
             + '<div class="mt-auto pt-4 border-t border-gray-100 text-sm">'
             + '<div class="flex justify-between mb-1"><span>予約数:</span><span class="font-bold">' + (t.current || 0) + ' / ' + t.capacity + '</span></div>'

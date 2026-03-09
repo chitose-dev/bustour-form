@@ -19,6 +19,7 @@ db = firestore.Client()
 # 定数
 PREFERRED_SEAT_PRICE = 500
 WAITLIST_MAX = 3  # キャンセル待ち最大枠数
+SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300
 LINE_CHANNEL_TOKEN = os.getenv('LINE_CHANNEL_TOKEN', 'YOUR_LINE_CHANNEL_TOKEN')
 LINE_MESSAGING_API = 'https://api.line.me/v2/bot/message/push'
 SMTP_HOST = os.getenv('SMTP_HOST', '')
@@ -109,6 +110,21 @@ def send_reservation_email(to_email, subject, body):
         return True
     except Exception as e:
         print(f"メール送信エラー: {e}")
+        return False
+
+
+def is_special_member(line_user_id):
+    """特別会員（LINE user id）かどうかを判定"""
+    if not line_user_id:
+        return False
+    try:
+        doc = db.collection('special_member_line_users').document(line_user_id).get()
+        if not doc.exists:
+            return False
+        data = doc.to_dict() or {}
+        return bool(data.get('enabled', True))
+    except Exception as e:
+        print(f"Special member check error: {e}")
         return False
 
 # ---------------------------------
@@ -533,7 +549,12 @@ def create_reservation():
             
             # 7. 予約作成
             seat_upcharge = len([s for s in preferred_seats if s]) * PREFERRED_SEAT_PRICE
-            total_price = passengers * price_per_person + seat_upcharge
+            member_discount_total = 0
+            is_member = is_special_member(line_user_id)
+            if is_member:
+                member_discount_total = passengers * SPECIAL_MEMBER_DISCOUNT_PER_PERSON
+
+            total_price = max(passengers * price_per_person + seat_upcharge - member_discount_total, 0)
             
             reservation_status = 'waitlist' if is_waitlist else 'confirmed'
             reservation = {
@@ -548,6 +569,9 @@ def create_reservation():
                 'pickups': pickups,
                 'preferredSeats': preferred_seats,
                 'totalPrice': total_price,
+                'specialMember': is_member,
+                'memberDiscountPerPerson': SPECIAL_MEMBER_DISCOUNT_PER_PERSON if is_member else 0,
+                'memberDiscountTotal': member_discount_total,
                 'status': reservation_status,
                 'progressStatus': 'shipping',
                 'remark': str((user_info or {}).get('remark') or '').strip(),
