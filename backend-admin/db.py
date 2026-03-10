@@ -129,55 +129,34 @@ def _apply_member_discount_to_reservation_doc(doc_ref, data, enabled):
 
 
 def set_special_member_for_reservation(reservation_id, enabled):
-    """予約詳細チェックで特別会員をON/OFFし、該当予約と今後予約に割引を反映"""
+    """予約詳細チェックで特別会員をON/OFFし、該当予約のみ割引反映。
+    次回以降は LINE user id の会員状態のみ参照する。"""
     target_ref = db.collection('reservations').document(reservation_id)
     target_doc = target_ref.get()
     if not target_doc.exists:
         return False, 'reservation_not_found', 0
 
     target_data = target_doc.to_dict()
+    if target_data.get('status') == 'cancelled':
+        return False, 'reservation_cancelled', 0
+
     line_user_id = target_data.get('lineUserId') or target_data.get('line_user_id')
     if not line_user_id:
         return False, 'line_user_id_required', 0
 
-    # LINE user id リストを管理
+    # LINE user id リストを管理（最後に編集された状態を保持）
     member_ref = db.collection('special_member_line_users').document(line_user_id)
-    if enabled:
-        member_ref.set({
-            'lineUserId': line_user_id,
-            'enabled': True,
-            'discountPerPerson': SPECIAL_MEMBER_DISCOUNT_PER_PERSON,
-            'updatedAt': datetime.now().isoformat()
-        }, merge=True)
-    else:
-        member_ref.delete()
+    member_ref.set({
+        'lineUserId': line_user_id,
+        'enabled': bool(enabled),
+        'discountPerPerson': SPECIAL_MEMBER_DISCOUNT_PER_PERSON,
+        'updatedAt': datetime.now().isoformat()
+    }, merge=True)
 
-    # 対象予約 + その人の今後予約へ反映（キャンセル除外、同日以降）
-    target_date = target_data.get('date', '')
-    updated_count = 0
-    seen_ids = set()
+    # 今回編集した予約1件のみに反映（既存の他予約には適用しない）
+    _apply_member_discount_to_reservation_doc(target_ref, target_data, bool(enabled))
 
-    queries = [
-        db.collection('reservations').where('lineUserId', '==', line_user_id).stream(),
-        db.collection('reservations').where('line_user_id', '==', line_user_id).stream()
-    ]
-
-    for stream in queries:
-        for doc in stream:
-            if doc.id in seen_ids:
-                continue
-            seen_ids.add(doc.id)
-
-            data = doc.to_dict()
-            if data.get('status') == 'cancelled':
-                continue
-            if data.get('date', '') < target_date:
-                continue
-
-            _apply_member_discount_to_reservation_doc(doc.reference, data, enabled)
-            updated_count += 1
-
-    return True, '', updated_count
+    return True, '', 1
 
 def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark=''):
     """手入力予約作成（LINE通知なし）"""

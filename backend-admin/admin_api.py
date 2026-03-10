@@ -162,6 +162,8 @@ def update_reservation_api(reservation_id):
             if not ok:
                 if err_code == 'reservation_not_found':
                     return jsonify({'error': 'reservation not found'}), 404
+                if err_code == 'reservation_cancelled':
+                    return jsonify({'error': 'cancelled reservation cannot apply special member'}), 400
                 if err_code == 'line_user_id_required':
                     return jsonify({'error': 'lineUserId is required for special member'}), 400
                 return jsonify({'error': 'failed to update special member'}), 500

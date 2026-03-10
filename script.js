@@ -512,12 +512,13 @@ function showReservationDetail(id) {
         + '</div>'
         + '<div class="mt-3 p-3 border rounded bg-white">'
         + '<label class="flex items-center gap-2 text-sm font-bold">'
-        + '<input type="checkbox" id="detail-special-member" ' + (r.specialMember ? 'checked' : '') + ' ' + (!r.lineUserId ? 'disabled' : '') + '>'
+        + '<input type="checkbox" id="detail-special-member" ' + (r.specialMember ? 'checked' : '') + ' ' + (!r.lineUserId || r.status === 'cancelled' ? 'disabled' : '') + '>'
         + '<span>特別会員（1人あたり300円引き）</span>'
         + '</label>'
         + '<p class="text-xs text-gray-500 mt-1">チェックすると、この予約と同じLINE IDの今後予約にも割引を適用します</p>'
         + (!r.lineUserId ? '<p class="text-xs text-red-500 mt-1">LINE IDが無い予約は特別会員登録できません</p>' : '')
-        + '<button onclick="updateSpecialMember(\'' + r.id + '\');" class="mt-2 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-2 rounded text-sm">会員設定を保存</button>'
+        + (r.status === 'cancelled' ? '<p class="text-xs text-red-500 mt-1">キャンセル済み予約には特別会員を適用できません</p>' : '')
+        + '<button onclick="updateSpecialMember(\'' + r.id + '\');" ' + (r.status === 'cancelled' ? 'disabled' : '') + ' class="mt-2 w-full bg-blue-50 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 text-blue-700 font-bold py-2 rounded text-sm">会員設定を保存</button>'
         + '</div>'
         + (r.status === 'confirmed' ? '<div class="mt-4"><button onclick="updateReservationStatus(\'' + r.id + '\', \'cancelled\'); closeModal(\'modal-reservation-detail\')" class="w-full bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2 rounded-lg text-sm transition"><i class="fa-solid fa-ban mr-1"></i> この予約をキャンセルする</button></div>' : '');
     
@@ -595,6 +596,12 @@ async function updateSpecialMember(id) {
     const checkbox = document.getElementById('detail-special-member');
     if (!checkbox) return;
 
+    const target = cachedReservations.find(function(r) { return r.id === id; }) || cachedWaitlist.find(function(r) { return r.id === id; });
+    if (target && target.status === 'cancelled') {
+        alert('キャンセル済み予約には特別会員を適用できません');
+        return;
+    }
+
     try {
         const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
             method: 'PATCH',
@@ -607,7 +614,11 @@ async function updateSpecialMember(id) {
 
         if (!res.ok) {
             const errorBody = await res.json().catch(() => ({}));
-            alert(errorBody.error || '特別会員の更新に失敗しました');
+            if (errorBody.error === 'cancelled reservation cannot apply special member') {
+                alert('キャンセル済み予約には特別会員を適用できません');
+            } else {
+                alert(errorBody.error || '特別会員の更新に失敗しました');
+            }
             return;
         }
 
