@@ -173,7 +173,7 @@ def format_reservation_message(reservations):
     if not reservations:
         return """予約情報が見つかりませんでした。
 
-・終了したツアー・キャンセルしたツアーの予約は除外されています。
+・開催日を過ぎたツアーの予約は表示されません。
 
 ご予約についてご不明点がある場合は、直接LINEメッセージにてお問い合わせください。
 新しく予約を作成される場合は「新規予約」ボタンをタップしてください。"""
@@ -185,6 +185,15 @@ def format_reservation_message(reservations):
         passengers = res.get('passengers', 0)
         total_price = res.get('totalPrice', 0)
         pickups = res.get('pickups', [])
+        status = res.get('status', '')
+
+        status_label_map = {
+            'pending': '予約申込中',
+            'confirmed': 'ご予約確定',
+            'cancelled': 'キャンセル',
+            'waitlist': 'キャンセル待ち'
+        }
+        status_label = status_label_map.get(status, status or '-')
 
         # 乗車地表示を組み立て
         pickup_display = ''
@@ -206,6 +215,7 @@ def format_reservation_message(reservations):
 
         block = f"""📅 日付: {res.get('date', '')}
 🚌 コース名: {res.get('tourTitle', '')}
+📝 ステータス: {status_label}
 👤 代表者: {name}様
 👥 人数: {passengers}名
 💰 料金: ¥{total_price:,}
@@ -214,7 +224,7 @@ def format_reservation_message(reservations):
 {pickup_display}"""
         blocks.append(block)
 
-    header = "下記の通りお申込を承りました。\n\n"
+    header = "ご予約情報は以下の通りです。\n\n"
     return header + "\n\n━━━━━━━━━━━━━━━\n\n".join(blocks)
 
 

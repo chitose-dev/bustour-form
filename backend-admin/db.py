@@ -183,7 +183,7 @@ def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, 
     return doc_ref.id
 
 def get_user_active_reservations(line_user_id):
-    """ユーザーの有効な予約を取得（キャンセル済み・当日過ぎた予約を除外）"""
+    """ユーザーの有効な予約を取得（開催日が過ぎた予約を除外）"""
     today = datetime.now().strftime('%Y-%m-%d')
     reservations = []
 
@@ -192,8 +192,6 @@ def get_user_active_reservations(line_user_id):
 
     for doc in query.stream():
         res_data = doc.to_dict()
-        if res_data.get('status') not in ('confirmed', 'pending'):
-            continue
         # 当日以降の予約のみ（当日含む）
         if res_data.get('date', '') >= today:
             res_data['id'] = doc.id
