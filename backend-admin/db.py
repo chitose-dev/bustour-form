@@ -74,7 +74,7 @@ def update_reservation_status(reservation_id, new_status=None, progress_status=N
                 all_reservations = list(db.collection('reservations').where('tour_id', '==', tour_id).stream())
                 for res in all_reservations:
                     r_data = res.to_dict()
-                    if res.id != reservation_id and r_data.get('status') == 'confirmed':
+                    if res.id != reservation_id and r_data.get('status') in ('confirmed', 'pending'):
                         current_count += int(r_data.get('passengers', 0) or 0)
 
         # === 全ての書き込みをまとめて行う ===
@@ -188,11 +188,12 @@ def get_user_active_reservations(line_user_id):
     reservations = []
 
     query = db.collection('reservations') \
-        .where('lineUserId', '==', line_user_id) \
-        .where('status', '==', 'confirmed')
+        .where('lineUserId', '==', line_user_id)
 
     for doc in query.stream():
         res_data = doc.to_dict()
+        if res_data.get('status') not in ('confirmed', 'pending'):
+            continue
         # 当日以降の予約のみ（当日含む）
         if res_data.get('date', '') >= today:
             res_data['id'] = doc.id
@@ -220,9 +221,13 @@ def get_tours(date_from=None, date_to=None):
         if date_to and date > date_to:
             continue
         
-        # 現在の予約数をカウント
-        reservations_ref = db.collection('reservations').where('tour_id', '==', doc.id).where('status', '==', 'confirmed')
-        current_count = sum(res.to_dict().get('passengers', 0) for res in reservations_ref.stream())
+        # 現在の予約数をカウント（申込中・確定済みを合算）
+        reservations_ref = db.collection('reservations').where('tour_id', '==', doc.id)
+        current_count = sum(
+            res.to_dict().get('passengers', 0)
+            for res in reservations_ref.stream()
+            if res.to_dict().get('status') in ('confirmed', 'pending')
+        )
         
         tour_data['id'] = doc.id
         tour_data['current_count'] = current_count

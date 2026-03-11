@@ -69,9 +69,11 @@ function normalizeReservation(reservation) {
 }
 
 function getStatusMeta(statusKey) {
+    if (statusKey === 'pending') return { label: '予約申込中', className: 'text-yellow-600 bg-yellow-50' };
+    if (statusKey === 'confirmed') return { label: 'ご予約確定', className: 'text-green-600 bg-green-50' };
     if (statusKey === 'cancelled') return { label: 'キャンセル', className: 'text-red-600 bg-red-50' };
     if (statusKey === 'waitlist') return { label: 'キャンセル待ち', className: 'text-orange-600 bg-orange-50' };
-    return { label: '確定', className: 'text-green-600 bg-green-50' };
+    return { label: '予約申込中', className: 'text-yellow-600 bg-yellow-50' };
 }
 
 function getProgressMeta(progressKey) {
@@ -193,26 +195,31 @@ async function loadInitialData() {
             { id: 'p4', name: '大宮駅 西口', sortOrder: 4, active: false }
         ];
     } else {
-        const [resTours, resPick, resConfirmed, resCancelled, resWaitlist] = await Promise.all([
+        const [resTours, resPick, resPending, resConfirmed, resCancelled, resWaitlist] = await Promise.all([
             fetch(`${API_BASE_URL}/tours`, { headers: getAuthHeaders() }),
             fetch(`${API_BASE_URL}/pickups`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/reservations?status=pending`, { headers: getAuthHeaders() }),
             fetch(`${API_BASE_URL}/reservations?status=confirmed`, { headers: getAuthHeaders() }),
             fetch(`${API_BASE_URL}/reservations?status=cancelled`, { headers: getAuthHeaders() }),
             fetch(`${API_BASE_URL}/reservations?status=waitlist`, { headers: getAuthHeaders() })
         ]);
 
-        if (!resTours.ok || !resPick.ok || !resConfirmed.ok || !resCancelled.ok || !resWaitlist.ok) {
+        if (!resTours.ok || !resPick.ok || !resPending.ok || !resConfirmed.ok || !resCancelled.ok || !resWaitlist.ok) {
             throw new Error('API request failed');
         }
 
         const toursData = await resTours.json();
         const pickupsData = await resPick.json();
+        const reservationsPendingData = await resPending.json();
         const reservationsConfirmedData = await resConfirmed.json();
         const reservationsCancelledData = await resCancelled.json();
         const reservationsWaitlistData = await resWaitlist.json();
 
         cachedTours = (Array.isArray(toursData) ? toursData : []).map(normalizeTour);
 
+        const reservationArrayPending = Array.isArray(reservationsPendingData)
+            ? reservationsPendingData
+            : (Array.isArray(reservationsPendingData.reservations) ? reservationsPendingData.reservations : []);
         const reservationArrayConfirmed = Array.isArray(reservationsConfirmedData)
             ? reservationsConfirmedData
             : (Array.isArray(reservationsConfirmedData.reservations) ? reservationsConfirmedData.reservations : []);
@@ -220,7 +227,7 @@ async function loadInitialData() {
             ? reservationsCancelledData
             : (Array.isArray(reservationsCancelledData.reservations) ? reservationsCancelledData.reservations : []);
 
-        cachedReservations = [...reservationArrayConfirmed, ...reservationArrayCancelled].map(normalizeReservation);
+        cachedReservations = [...reservationArrayPending, ...reservationArrayConfirmed, ...reservationArrayCancelled].map(normalizeReservation);
 
         const reservationArrayWaitlist = Array.isArray(reservationsWaitlistData)
             ? reservationsWaitlistData
@@ -370,7 +377,7 @@ function downloadCSV() {
 
     const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '人数', '乗車地', '前列座席', '金額', 'ステータス', '進捗'];
     const rows = filtered.map(function(r) {
-        const statusLabel = r.status === 'cancelled' ? 'キャンセル' : r.status === 'waitlist' ? 'キャンセル待ち' : '確定';
+        const statusLabel = r.status === 'cancelled' ? 'キャンセル' : r.status === 'waitlist' ? 'キャンセル待ち' : r.status === 'pending' ? '予約申込中' : 'ご予約確定';
         const progressLabel = r.progressStatus === 'middle' ? '中間' : r.progressStatus === 'final' ? '最終' : '発送';
         const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
         const tourName = tourObj ? tourObj.title : r.tour_name;
@@ -470,7 +477,7 @@ function loadReservations() {
             + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'shipping\')" class="text-green-600 underline text-xs lg:text-sm">発送</button>' : '')
             + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'middle\')" class="text-blue-600 underline text-xs lg:text-sm">中間</button>' : '')
             + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'final\')" class="text-purple-600 underline text-xs lg:text-sm">最終</button>' : '')
-            + (r.status === 'confirmed' ? ' <button onclick="event.stopPropagation(); updateReservationStatus(\'' + r.id + '\', \'cancelled\')" class="text-red-600 underline text-xs lg:text-sm">取消</button>' : '')
+            + (r.status === 'confirmed' || r.status === 'pending' ? ' <button onclick="event.stopPropagation(); updateReservationStatus(\'' + r.id + '\', \'cancelled\')" class="text-red-600 underline text-xs lg:text-sm">取消</button>' : '')
             + '</td>';
         tr.onclick = function() { showReservationDetail(r.id); };
         tbody.appendChild(tr);
@@ -520,7 +527,16 @@ function showReservationDetail(id) {
         + (r.status === 'cancelled' ? '<p class="text-xs text-red-500 mt-1">キャンセル済み予約には特別会員を適用できません</p>' : '')
         + '<button onclick="updateSpecialMember(\'' + r.id + '\');" ' + (r.status === 'cancelled' ? 'disabled' : '') + ' class="mt-2 w-full bg-blue-50 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 text-blue-700 font-bold py-2 rounded text-sm">会員設定を保存</button>'
         + '</div>'
-        + (r.status === 'confirmed' ? '<div class="mt-4"><button onclick="updateReservationStatus(\'' + r.id + '\', \'cancelled\'); closeModal(\'modal-reservation-detail\')" class="w-full bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2 rounded-lg text-sm transition"><i class="fa-solid fa-ban mr-1"></i> この予約をキャンセルする</button></div>' : '');
+        + '<div class="mt-3 p-3 border rounded bg-white">'
+        + '<label class="block text-sm font-bold mb-2">ステータス変更</label>'
+        + '<select id="detail-status-select" class="w-full border p-2 rounded text-sm mb-2">'
+        + '<option value="pending"' + (r.status === 'pending' ? ' selected' : '') + '>【予約申込中】</option>'
+        + '<option value="confirmed"' + (r.status === 'confirmed' ? ' selected' : '') + '>【ご予約確定】</option>'
+        + '<option value="cancelled"' + (r.status === 'cancelled' ? ' selected' : '') + '>【キャンセル】</option>'
+        + '<option value="waitlist"' + (r.status === 'waitlist' ? ' selected' : '') + '>【キャンセル待ち】</option>'
+        + '</select>'
+        + '<button onclick="saveDetailStatus(\'' + r.id + '\');" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded text-sm">ステータスを保存</button>'
+        + '</div>';
     
     openModal('modal-reservation-detail');
 }
@@ -590,6 +606,14 @@ async function updateReservationStatus(id, newStatus) {
             alert('通信エラーが発生しました');
         }
     }
+}
+
+async function saveDetailStatus(id) {
+    const select = document.getElementById('detail-status-select');
+    if (!select) return;
+    const newStatus = select.value;
+    closeModal('modal-reservation-detail');
+    await updateReservationStatus(id, newStatus);
 }
 
 async function updateSpecialMember(id) {

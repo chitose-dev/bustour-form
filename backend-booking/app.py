@@ -314,7 +314,7 @@ def get_tours():
             tour_reservations = db.collection('reservations').where('tour_id', '==', tour_id).stream()
             for res in tour_reservations:
                 r_data = res.to_dict()
-                if r_data.get('status') == 'confirmed':
+                if r_data.get('status') in ('confirmed', 'pending'):
                     current_count += r_data.get('passengers', 0)
                 elif r_data.get('status') == 'waitlist':
                     waitlist_count += 1
@@ -529,18 +529,18 @@ def create_reservation():
                 reservation_data = doc.to_dict()
                 existing_line_user_id = reservation_data.get('lineUserId') or reservation_data.get('line_user_id')
                 if (
-                    reservation_data.get('status') in ('confirmed', 'waitlist')
+                    reservation_data.get('status') in ('confirmed', 'pending', 'waitlist')
                     and reservation_data.get('tour_id') == tour_id
                     and reservation_data.get('date') == date
                     and existing_line_user_id == line_user_id
                 ):
                     raise ValueError('Duplicate reservation')
             
-            # 5. 現在の予約人数をカウント
+            # 5. 現在の予約人数をカウント（申込中・確定済みを合算）
             current_count = 0
             for res_doc in db.collection('reservations').stream():
                 reservation_data = res_doc.to_dict()
-                if reservation_data.get('tour_id') == tour_id and reservation_data.get('status') == 'confirmed':
+                if reservation_data.get('tour_id') == tour_id and reservation_data.get('status') in ('confirmed', 'pending'):
                     current_count += int(reservation_data.get('passengers', 0) or 0)
             
             # 6. 定員チェック（キャンセル待ちの場合はスキップ）
@@ -556,7 +556,7 @@ def create_reservation():
 
             total_price = max(passengers * price_per_person + seat_upcharge - member_discount_total, 0)
             
-            reservation_status = 'waitlist' if is_waitlist else 'confirmed'
+            reservation_status = 'waitlist' if is_waitlist else 'pending'
             reservation = {
                 'lineUserId': line_user_id,
                 'line_user_id': line_user_id,
@@ -648,17 +648,22 @@ def create_reservation():
 📝 お申込み状況: {status_label}
 
 お問い合わせありがとうございます。
-正式なご予約は、弊社からのご連絡をもって確定となります。
-担当者からのご連絡をお待ちください。
+ご予約の確定は、予約確認のページでご覧いただけます。
+予約確定まで2営業日程かかる場合があります
 
-2営業日（土日祝定休）を経過しても連絡がない場合は、お申込が届いていない可能性がございます。
+2営業日（土日祝定休）を経過しても予約状況が変わらない場合は、
+お申込が届いていない可能性がございます。
 その際はお手数ですがご一報ください。
 
-乗車地【木之本・米原・彦根】は、他のお客様を含めて5名以上の申込みがない場合、乗車地の変更をお願いする場合がございます。
+乗車地【木之本・米原】は、
+他のお客様を含めて5名以上の申込みがない場合、
+乗車地の変更をお願いする場合がございます。
 
 【よくある質問】
-・時間は何時ですか？←旅行日より１～２週間前に旅程表をお送りいたしますのでお待ち下さい
-・お支払いはどうしたら良いですか？←当日現金またはPayPayで頂戴しております"""
+Q出発時間は何時ですか？
+A旅行日より１～２週間前に旅程表をお送りいたします
+Qお支払いはどうしたら良いですか？
+A当日現金またはPayPayで頂戴しております"""
 
         if line_user_id:
             send_line_notification(line_user_id, message)
