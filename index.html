@@ -244,6 +244,10 @@
                         <span class="text-gray-600">座席指定料</span>
                         <span class="font-bold" id="conf-seat-price">¥0</span>
                     </div>
+                    <div id="conf-discount-row" class="flex justify-between text-sm lg:text-xl" style="display:none;">
+                        <span class="text-green-600">特別会員割引</span>
+                        <span class="font-bold text-green-600" id="conf-discount">-¥0</span>
+                    </div>
                     <div class="flex justify-between items-center mt-4 lg:mt-6 pt-4 lg:pt-6 border-t border-gray-300">
                         <span class="text-lg lg:text-2xl font-bold">合計金額</span>
                         <span class="text-3xl lg:text-4xl font-bold text-red-600" id="conf-total">¥0</span>
@@ -261,6 +265,7 @@
     <script>
         const BOOKING_API_BASE = "https://backend-booking-482800127304.asia-northeast1.run.app/api/booking";
         const PREFERRED_SEAT_PRICE = 500;
+        const SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300;
 
         let PICKUP_OPTIONS = [];
         let calendarData = {};
@@ -289,7 +294,8 @@
             pickups: [],
             preferredSeats: [],
             isSubmitting: false,
-            isWaitlist: false
+            isWaitlist: false,
+            isSpecialMember: false
         };
 
         // カレンダー表示用の年月管理
@@ -555,6 +561,9 @@
                 const response = await fetch(`${BOOKING_API_BASE}/profile?lineUserId=${cache.lineUserId}`);
                 if (response.ok) {
                     const profile = await response.json();
+                    if (profile.isSpecialMember) {
+                        cache.isSpecialMember = true;
+                    }
                     if (profile && Object.keys(profile).length > 0) {
                         localStorage.setItem('user_profile_cache', JSON.stringify(profile));
                     }
@@ -996,10 +1005,20 @@
             const baseTour = cache.pricePerPerson * cache.passengers;
             const seatUpchargeCount = cache.preferredSeats.filter(s => s).length;
             const seatUpcharge = seatUpchargeCount * PREFERRED_SEAT_PRICE;
-            const total = baseTour + seatUpcharge;
-            
+            const discountTotal = cache.isSpecialMember ? cache.passengers * SPECIAL_MEMBER_DISCOUNT_PER_PERSON : 0;
+            const total = Math.max(baseTour + seatUpcharge - discountTotal, 0);
+
             document.getElementById('conf-base-price').innerText = "¥" + baseTour.toLocaleString();
             document.getElementById('conf-seat-price').innerText = "¥" + seatUpcharge.toLocaleString();
+
+            const discountRow = document.getElementById('conf-discount-row');
+            if (cache.isSpecialMember) {
+                discountRow.style.display = 'flex';
+                document.getElementById('conf-discount').innerText = "-¥" + discountTotal.toLocaleString();
+            } else {
+                discountRow.style.display = 'none';
+            }
+
             document.getElementById('conf-total').innerText = "¥" + total.toLocaleString();
 
             const pickupContainer = document.getElementById('conf-pickups');

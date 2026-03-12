@@ -353,17 +353,19 @@ def get_profile():
         return jsonify({}), 200  # 新規顧客
     
     try:
+        result = {}
         user_profile_doc = db.collection('user_profiles').document(line_user_id).get()
         if user_profile_doc.exists:
             profile_data = user_profile_doc.to_dict()
             # consentAutoFill=true のときのみ自動入力候補として返す
             if profile_data.get('consentAutoFill', False):
-                return jsonify(profile_data), 200
-            else:
-                return jsonify({}), 200  # 同意していない場合は空を返す
-        else:
-            return jsonify({}), 200
-    
+                result = profile_data
+
+        # 特別会員かどうかを返す
+        result['isSpecialMember'] = is_special_member(line_user_id)
+
+        return jsonify(result), 200
+
     except Exception as e:
         print(f"Profile API error: {e}")
         return jsonify({'error': str(e)}), 500
