@@ -268,9 +268,31 @@ def update_tour(tour_id, **kwargs):
     return True
 
 def delete_tour(tour_id):
-    """ツアー削除"""
+    """ツアー削除（紐づく予約も全削除）"""
+    # 同じtour_idに紐づく予約をステータス関係なく全削除
+    delete_reservations_by_tour(tour_id)
     db.collection('tours').document(tour_id).delete()
     return True
+
+def delete_reservations_by_tour(tour_id):
+    """指定ツアーに紐づく予約を全件物理削除（ステータス不問）"""
+    docs = db.collection('reservations').where('tour_id', '==', tour_id).stream()
+    batch = db.batch()
+    batch_count = 0
+    deleted_count = 0
+    for doc in docs:
+        batch.delete(doc.reference)
+        batch_count += 1
+        deleted_count += 1
+        if batch_count >= 500:
+            batch.commit()
+            batch = db.batch()
+            batch_count = 0
+    if batch_count > 0:
+        batch.commit()
+    if deleted_count > 0:
+        print(f"ツアー {tour_id} に紐づく予約を全削除: {deleted_count}件")
+    return deleted_count
 
 # ---------------------------------
 # 乗車地操作
@@ -311,13 +333,12 @@ def delete_pickup(pickup_id):
 
 
 def cleanup_old_cancelled_reservations(months=3):
-    """キャンセルから指定月数経過した予約を物理削除（キャンセルのみ対象）"""
+    """キャンセル済み予約のうち、ツアー実施日から指定月数経過したものを物理削除"""
     cutoff_date = datetime.now() - timedelta(days=months * 30)
-    cutoff_str = cutoff_date.isoformat()
+    cutoff_str = cutoff_date.strftime('%Y-%m-%d')
     
     deleted_count = 0
     try:
-        # キャンセル済み予約を全件取得
         cancelled_docs = db.collection('reservations').where('status', '==', 'cancelled').stream()
         
         batch = db.batch()
@@ -325,18 +346,17 @@ def cleanup_old_cancelled_reservations(months=3):
         
         for doc in cancelled_docs:
             data = doc.to_dict()
-            cancelled_at = data.get('cancelledAt') or data.get('updatedAt') or data.get('createdAt', '')
+            tour_date = data.get('date', '')
             
-            if not cancelled_at:
+            if not tour_date:
                 continue
             
-            # cancelledAt が cutoff より古ければ削除対象
-            if cancelled_at < cutoff_str:
+            # ツアー実施日が cutoff より古ければ削除対象
+            if tour_date < cutoff_str:
                 batch.delete(doc.reference)
                 batch_count += 1
                 deleted_count += 1
                 
-                # Firestoreのバッチは最大500件
                 if batch_count >= 500:
                     batch.commit()
                     batch = db.batch()
@@ -346,45 +366,10 @@ def cleanup_old_cancelled_reservations(months=3):
             batch.commit()
         
         if deleted_count > 0:
-            print(f"古いキャンセル予約を物理削除: {deleted_count}件（{months}ヶ月以上経過）")
+            print(f"古いキャンセル予約を物理削除: {deleted_count}件（ツアー日から{months}ヶ月以上経過）")
         
         return deleted_count
     
     except Exception as e:
         print(f"キャンセル予約クリーンアップエラー: {e}")
-        return 0
-
-def cleanup_past_waitlist():
-    """ツアー実施日を過ぎたキャンセル待ち予約を自動削除"""
-    today = datetime.now().strftime('%Y-%m-%d')
-    deleted_count = 0
-    try:
-        waitlist_docs = db.collection('reservations').where('status', '==', 'waitlist').stream()
-        
-        batch = db.batch()
-        batch_count = 0
-        
-        for doc in waitlist_docs:
-            data = doc.to_dict()
-            tour_date = data.get('date', '')
-            if tour_date and tour_date < today:
-                batch.delete(doc.reference)
-                batch_count += 1
-                deleted_count += 1
-                
-                if batch_count >= 500:
-                    batch.commit()
-                    batch = db.batch()
-                    batch_count = 0
-        
-        if batch_count > 0:
-            batch.commit()
-        
-        if deleted_count > 0:
-            print(f"期限切れキャンセル待ちを削除: {deleted_count}件")
-        
-        return deleted_count
-    
-    except Exception as e:
-        print(f"キャンセル待ちクリーンアップエラー: {e}")
         return 0
