@@ -166,7 +166,7 @@
                 </div>
                 <div class="mb-6" id="preferred-seats-area"></div>
                 <div class="mb-8 flex items-center bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                    <input type="checkbox" id="consent-next" class="w-6 h-6 text-primary border-gray-300 rounded focus:ring-primary">
+                    <input type="checkbox" id="consent-next" class="w-6 h-6 text-primary border-gray-300 rounded focus:ring-primary" checked>
                     <label for="consent-next" class="ml-3 text-lg font-bold">次回もこの情報を使う</label>
                 </div>
                 <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-4 rounded-xl text-xl shadow-md border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
@@ -666,9 +666,8 @@
                         ${statusBadge}
                     </div>
                     <div class="p-4 lg:p-6">
-                        <h3 class="text-xl lg:text-2xl font-bold mb-2 lg:mb-3 truncate lg:whitespace-normal lg:overflow-visible">${tour.title}</h3>
+                        <h3 class="text-xl lg:text-2xl font-bold mb-2 lg:mb-3 whitespace-pre-line">${tour.title}</h3>
                         <p class="text-gray-700 mb-2 lg:mb-3 text-lg lg:text-xl">${tour.description || ''}</p>
-                        <p class="text-sm lg:text-lg text-gray-500 mb-4 lg:mb-6">${isWaitlistOpen ? 'キャンセル待ち ' + tour.waitlist_count + '/' + tour.waitlist_max + '名' : (isFull ? '' : '残り ' + tour.remainingSeats + '席')}</p>
                         <div class="flex justify-between items-end">
                             <span class="text-2xl lg:text-3xl font-bold">¥${tour.price.toLocaleString()}</span>
                             ${actionButton}
@@ -1053,7 +1052,7 @@
             
             const isWaitlist = cache.isWaitlist;
             const icon = isWaitlist ? '⏳' : '✅';
-            const heading = isWaitlist ? 'キャンセル待ちを受け付けました' : '予約を受け付けました';
+            const heading = isWaitlist ? 'キャンセル待ちを受け付けました' : 'お問い合わせを受け付けました';
             const waitlistNote = isWaitlist 
                 ? `<div class="bg-orange-50 border-2 border-orange-200 p-4 rounded-xl mb-4">
                     <p class="text-orange-700 font-bold">⚠️ キャンセル待ち予約です</p>
@@ -1072,18 +1071,30 @@
                 ${waitlistNote}
 
                 <div class="bg-blue-50 border-2 border-blue-100 p-6 rounded-xl text-left w-full mb-6 space-y-4">
-                    <p class="text-base leading-relaxed">
-                        弊社が確認後、LINEにて、予約確定通知をお送りいたします。担当者からの連絡をお待ちください。
+                    <p class="text-base leading-relaxed font-bold">
+                        お問い合わせありがとうございます。
                     </p>
                     <p class="text-base leading-relaxed">
-                        2営業日（土日祝休）を経過してもご連絡がない場合は、お申込みが届いていない可能性がございます。その際はお手数ですがご一報ください。
+                        ご予約の確定は、予約確認のページでご覧いただけます。<br>
+                        予約確定まで2営業日程かかる場合があります
                     </p>
                     <p class="text-base leading-relaxed">
-                        乗車地「六之本・米原・彦根」は他のお客様を含めて5名以上のお申込みがない場合、変更をお願いする場合がございます。
+                        2営業日（土日祝定休）を経過しても予約状況が変わらない場合は、<br>
+                        お申込が届いていない可能性がございます。<br>
+                        その際はお手数ですがご一報ください。
                     </p>
-                    <p class="text-base leading-relaxed font-bold text-red-600">
-                        キャンセルは公式LINEからご連絡ください。
+                    <p class="text-base leading-relaxed">
+                        乗車地【木之本・米原】は、<br>
+                        他のお客様を含めて5名以上の申込みがない場合、<br>
+                        乗車地の変更をお願いする場合がございます。
                     </p>
+                    <div class="border-t pt-4 mt-4">
+                        <p class="text-base font-bold mb-2">【よくある質問】</p>
+                        <p class="text-sm leading-relaxed"><span class="font-bold">Q</span> 出発時間は何時ですか？<br>
+                        <span class="font-bold">A</span> 旅行日より１〜２週間前に旅程表をお送りいたします</p>
+                        <p class="text-sm leading-relaxed mt-2"><span class="font-bold">Q</span> お支払いはどうしたら良いですか？<br>
+                        <span class="font-bold">A</span> 当日現金またはPayPayで頂戴しております</p>
+                    </div>
                 </div>
 
                 <p class="text-xl font-bold text-gray-800">

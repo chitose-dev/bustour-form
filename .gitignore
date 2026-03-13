@@ -1,3 +1,8 @@
 firebase-key.json
 **/firebase-key.json
 form.html
+.firebase/
+.firebaserc
+firebase.json
+public/
+.DS_Store

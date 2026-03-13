@@ -241,6 +241,16 @@ async function loadInitialData() {
     switchTab('reservations');
 }
 
+async function refreshData() {
+    try {
+        await loadInitialData();
+        alert('データを更新しました');
+    } catch (err) {
+        console.error(err);
+        alert('データの更新に失敗しました');
+    }
+}
+
 // フィルター用ツアープルダウンを生成
 function populateFilterTourDropdown() {
     const select = document.getElementById('filter-tour-name');
@@ -333,20 +343,21 @@ function openModal(modalId) {
             opt.innerText = t.date + ' : ' + t.title + ' (残' + (t.capacity - (t.current || 0)) + ')';
             select.appendChild(opt);
         });
-        const pickupSelect = document.getElementById('manual-pickup');
-        pickupSelect.innerHTML = '<option value="">未選択</option>';
+        var pickupContainer = document.getElementById('manual-pickup-checkboxes');
+        pickupContainer.innerHTML = '';
         cachedPickups.filter(function(p) { return p.active; }).sort(function(a, b) { return a.sortOrder - b.sortOrder; }).forEach(function(p) {
-            const opt = document.createElement('option');
-            opt.value = p.name;
-            opt.innerText = p.name;
-            pickupSelect.appendChild(opt);
+            var label = document.createElement('label');
+            label.className = 'flex items-center gap-2 p-1 rounded hover:bg-gray-100 cursor-pointer';
+            label.innerHTML = '<input type="checkbox" value="' + p.name + '" class="manual-pickup-cb w-4 h-4"><span class="text-sm">' + p.name + '</span>';
+            pickupContainer.appendChild(label);
         });
     }
     
     if (modalId === 'modal-tour-editor' && !document.getElementById('edit-tour-id').value) {
         document.getElementById('form-tour-editor').reset();
         document.getElementById('edit-tour-id').value = '';
-        renderTourPickupCheckboxes([]);
+        var allPickupIds = cachedPickups.filter(function(p) { return p.active; }).map(function(p) { return p.id; });
+        renderTourPickupCheckboxes(allPickupIds);
     }
 }
 
@@ -433,10 +444,16 @@ function loadReservations() {
         return matchTour && matchDate && matchStatus;
     });
 
-    // 作成日時の新しい順にソート
-    filtered.sort(function(a, b) {
-        return (b.createdAt || '').localeCompare(a.createdAt || '');
-    });
+    // ソート
+    var sortKey = document.getElementById('filter-sort') ? document.getElementById('filter-sort').value : 'createdAt';
+    if (sortKey === 'tourDate') {
+        filtered.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
+    } else if (sortKey === 'status') {
+        var statusOrder = { pending: 0, confirmed: 1, waitlist: 2, cancelled: 3 };
+        filtered.sort(function(a, b) { return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0); });
+    } else {
+        filtered.sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+    }
 
     let totalPeople = 0;
     let totalSales = 0;
@@ -495,6 +512,12 @@ function showReservationDetail(id) {
     const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
     const tourName = tourObj ? tourObj.title : r.tour_name;
     
+    // 乗車地オプションを生成
+    var pickupOptionsHtml = '<option value="">未選択</option>';
+    cachedPickups.filter(function(p) { return p.active; }).sort(function(a, b) { return a.sortOrder - b.sortOrder; }).forEach(function(p) {
+        pickupOptionsHtml += '<option value="' + p.name + '"' + (r.pickup === p.name ? ' selected' : '') + '>' + p.name + '</option>';
+    });
+
     const body = document.getElementById('reservation-detail-body');
     body.innerHTML = ''
         + '<div class="bg-gray-50 rounded-lg p-4 space-y-3 border">'
@@ -503,16 +526,17 @@ function showReservationDetail(id) {
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">ツアー名</span><span class="font-bold text-sm text-right max-w-[60%]">' + tourName + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">ツアー日</span><span class="font-bold text-sm">' + r.date + '</span></div>'
         + '<hr>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">氏名</span><span class="font-bold text-sm">' + r.name + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">LINE ID</span><span class="font-bold text-sm text-gray-500 break-all">' + (r.lineUserId || '-') + '</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">電話番号</span><span class="font-bold text-sm">' + (r.phone || '-') + '</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">住所</span><span class="font-bold text-sm text-right max-w-[60%]">' + (r.address || '-') + '</span></div>'
         + '<hr>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">人数</span><span class="font-bold text-sm">' + r.count + '名</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">乗車地</span><span class="font-bold text-sm text-right max-w-[60%]">' + formatPickupsDisplay(r) + '</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">前列座席</span><span class="font-bold text-sm">' + (r.seat_pref || '-') + '</span></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">氏名</label><input type="text" id="edit-res-name" class="w-full border p-2 rounded text-sm" value="' + (r.name || '').replace(/"/g, '&quot;') + '"></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">電話番号</label><input type="tel" id="edit-res-phone" class="w-full border p-2 rounded text-sm" value="' + (r.phone || '').replace(/"/g, '&quot;') + '"></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">住所</label><input type="text" id="edit-res-address" class="w-full border p-2 rounded text-sm" value="' + (r.address || '').replace(/"/g, '&quot;') + '"></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">人数</label><input type="number" id="edit-res-count" class="w-full border p-2 rounded text-sm" min="1" value="' + r.count + '"></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">乗車地</label><select id="edit-res-pickup" class="w-full border p-2 rounded text-sm bg-white">' + pickupOptionsHtml + '</select></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
+        + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
+        + '<hr>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">備考</span><span class="font-bold text-sm text-right max-w-[60%]"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></span></div>'
-        + '<hr>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">特別会員</span><span class="font-bold text-sm">' + (r.specialMember ? '適用中' : '未適用') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">会員割引</span><span class="font-bold text-sm">-¥' + (r.memberDiscountTotal || 0).toLocaleString() + '</span></div>'
         + '<div class="flex justify-between items-center"><span class="text-gray-600 text-sm">合計金額</span><span class="font-bold text-lg text-red-600">¥' + r.amount.toLocaleString() + '</span></div>'
@@ -537,7 +561,7 @@ function showReservationDetail(id) {
         + '</select>'
         + '<button onclick="saveDetailStatus(\'' + r.id + '\');" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded text-sm">ステータスを保存</button>'
         + '</div>';
-    
+
     openModal('modal-reservation-detail');
 }
 
@@ -616,6 +640,48 @@ async function saveDetailStatus(id) {
     await updateReservationStatus(id, newStatus);
 }
 
+async function saveReservationEdit(id) {
+    var name = document.getElementById('edit-res-name').value.trim();
+    var phone = document.getElementById('edit-res-phone').value.trim();
+    var address = document.getElementById('edit-res-address').value.trim();
+    var count = parseInt(document.getElementById('edit-res-count').value);
+    var pickup = document.getElementById('edit-res-pickup').value;
+    var seatPref = document.getElementById('edit-res-seat').value;
+
+    if (!name) { alert('氏名を入力してください'); return; }
+    if (count < 1) { alert('人数は1以上にしてください'); return; }
+
+    try {
+        var payload = {
+            name: name,
+            phone: phone,
+            address: address,
+            passengers: count,
+            pickup: pickup,
+            seatPref: seatPref
+        };
+
+        var res = await fetch(API_BASE_URL + '/reservations/' + id, {
+            method: 'PATCH',
+            headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            var errorBody = await res.json().catch(function() { return {}; });
+            alert(errorBody.error || '予約情報の更新に失敗しました');
+            return;
+        }
+
+        await loadInitialData();
+        showReservationDetail(id);
+        alert('予約情報を更新しました');
+    } catch (err) {
+        console.error(err);
+        alert('通信エラーが発生しました');
+    }
+}
+
 async function updateSpecialMember(id) {
     const checkbox = document.getElementById('detail-special-member');
     if (!checkbox) return;
@@ -663,7 +729,8 @@ async function submitManualReservation() {
     const address = document.getElementById('manual-address').value;
     const count = parseInt(document.getElementById('manual-count').value);
     const price = parseInt(document.getElementById('manual-price').value);
-    const pickup = document.getElementById('manual-pickup').value;
+    var selectedPickups = Array.from(document.querySelectorAll('.manual-pickup-cb:checked')).map(function(cb) { return cb.value; });
+    var pickup = selectedPickups.join(', ');
     const seatPref = document.getElementById('manual-seat-pref').value;
 
     const tour = cachedTours.find(function(t) { return t.id === tourId; });
@@ -697,7 +764,7 @@ async function submitManualReservation() {
 
         try {
             const preferredSeats = Array(count).fill(seatPref === 'あり');
-            const pickups = pickup ? Array(count).fill(pickup) : [];
+            const pickups = selectedPickups.length > 0 ? selectedPickups : [];
 
             const payload = {
                 tour_id: tourId,
@@ -848,6 +915,16 @@ async function _submitTourInner() {
     const imageUrl = document.getElementById('edit-tour-img').value;
     
     const pickupIds = Array.from(document.querySelectorAll('.tour-pickup-cb:checked')).map(function(cb) { return cb.value; });
+
+    // 年が4桁を超えていないかチェック
+    if (date && date.split('-')[0].length > 4) {
+        alert('開催日の年は4桁以内で入力してください。');
+        return;
+    }
+    if (deadline && deadline.split('-')[0].length > 4) {
+        alert('締切日の年は4桁以内で入力してください。');
+        return;
+    }
 
     // 新規作成時は過去日付を禁止
     if (!id) {
