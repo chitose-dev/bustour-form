@@ -100,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function handleLogin(e) {
     e.preventDefault();
     const password = document.getElementById('login-password').value;
+    const loginBtn = document.querySelector('#login-form button[type="submit"], #login-form button:not([type])');
 
     if (USE_MOCK) {
         if (password === 'admin') {
@@ -108,12 +109,18 @@ async function handleLogin(e) {
             alert('パスワードが違います');
         }
     } else {
+        // ローディング表示
+        if (loginBtn) { loginBtn.textContent = 'ログイン中...'; loginBtn.disabled = true; }
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒タイムアウト
             const res = await fetch(`${API_BASE_URL}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
+                body: JSON.stringify({ password }),
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
             if (res.ok) {
                 const data = await res.json();
                 loginSuccess(data.token);
@@ -123,7 +130,13 @@ async function handleLogin(e) {
             }
         } catch (err) {
             console.error(err);
-            alert('通信エラー');
+            if (err.name === 'AbortError') {
+                alert('接続タイムアウト。しばらくしてから再度お試しください。');
+            } else {
+                alert('通信エラー。インターネット接続を確認してください。');
+            }
+        } finally {
+            if (loginBtn) { loginBtn.textContent = 'ログイン'; loginBtn.disabled = false; }
         }
     }
 }
