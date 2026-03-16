@@ -421,7 +421,7 @@ function downloadCSV() {
             r.phone || '',
             r.address || '',
             r.count,
-            r.pickup || '',
+            formatPickupsDisplay(r),
             r.seat_pref || 'なし',
             r.amount,
             statusLabel,
@@ -506,7 +506,7 @@ function loadReservations() {
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.pickup || '-') + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
