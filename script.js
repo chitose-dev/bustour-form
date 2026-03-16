@@ -82,12 +82,21 @@ function getProgressMeta(progressKey) {
     return { label: '発送', className: 'text-green-600 bg-green-50' };
 }
 
+function resolvePickupName(idOrName) {
+    if (!idOrName) return null;
+    // cachedPickupsのIDと照合
+    var found = cachedPickups.find(function(p) { return p.id === idOrName; });
+    if (found) return found.name || found.displayName || idOrName;
+    return idOrName; // IDでなければそのまま
+}
+
 function formatPickupsDisplay(r) {
     var pickups = Array.isArray(r.pickups) ? r.pickups.filter(Boolean) : [];
     if (pickups.length === 0) return r.pickup || '-';
-    var unique = pickups.filter(function(v, i, a) { return a.indexOf(v) === i; });
+    var resolved = pickups.map(resolvePickupName).filter(Boolean);
+    var unique = resolved.filter(function(v, i, a) { return a.indexOf(v) === i; });
     if (unique.length === 1) return unique[0];
-    return pickups.join(', ');
+    return resolved.join(', ');
 }
 
 // ==========================================
