@@ -42,6 +42,48 @@ def get_reservation(reservation_id):
     data['id'] = doc.id
     return data
 
+def delete_reservation(reservation_id):
+    """予約を物理削除。確定済み/申込中の削除時は必要に応じてツアー状態も戻す"""
+    res_ref = db.collection('reservations').document(reservation_id)
+    res_doc = res_ref.get()
+    if not res_doc.exists:
+        return False
+
+    res_data = res_doc.to_dict()
+    tour_id = res_data.get('tour_id')
+    status = res_data.get('status')
+    affects_inventory = status in ('confirmed', 'pending')
+
+    @firestore.transactional
+    def delete_with_inventory(transaction):
+        res_snapshot = res_ref.get(transaction=transaction)
+        if not res_snapshot.exists:
+            raise ValueError('Reservation not found in transaction')
+
+        if affects_inventory and tour_id:
+            tour_ref = db.collection('tours').document(tour_id)
+            tour_snapshot = tour_ref.get(transaction=transaction)
+            if tour_snapshot.exists:
+                tour_data = tour_snapshot.to_dict()
+                current_count = 0
+                all_reservations = list(db.collection('reservations').where('tour_id', '==', tour_id).stream())
+                for current_res in all_reservations:
+                    current_data = current_res.to_dict()
+                    if current_res.id != reservation_id and current_data.get('status') in ('confirmed', 'pending'):
+                        current_count += int(current_data.get('passengers', 0) or 0)
+
+                if tour_data.get('status') == 'full' and current_count < int(tour_data.get('capacity', 0) or 0):
+                    transaction.update(tour_ref, {
+                        'status': 'open',
+                        'updatedAt': datetime.now().isoformat()
+                    })
+
+        transaction.delete(res_ref)
+
+    transaction = db.transaction()
+    delete_with_inventory(transaction)
+    return True
+
 def update_reservation_status(reservation_id, new_status=None, progress_status=None, remark=None):
     """予約更新（status / progressStatus / remark）- キャンセル時は在庫を確実に復元"""
     res_doc = db.collection('reservations').document(reservation_id).get()
@@ -158,7 +200,7 @@ def set_special_member_for_reservation(reservation_id, enabled):
 
     return True, '', 1
 
-def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark=''):
+def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark='', special_member=False, member_discount_total=0):
     """手入力予約作成（LINE通知なし）"""
     reservation = {
         'lineUserId': None,
@@ -173,6 +215,9 @@ def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, 
         'status': 'confirmed',
         'progressStatus': 'shipping',
         'remark': remark,
+        'specialMember': bool(special_member),
+        'memberDiscountPerPerson': SPECIAL_MEMBER_DISCOUNT_PER_PERSON if special_member else 0,
+        'memberDiscountTotal': int(member_discount_total or 0),
         'isManualEntry': True,
         'createdAt': datetime.now().isoformat()
     }
@@ -262,9 +307,19 @@ def create_tour(title, date, deadline_date, capacity, price, status='open', desc
     return doc_ref.id
 
 def update_tour(tour_id, **kwargs):
-    """ツアー更新"""
+    """ツアー更新。title更新時は紐づく予約の tourTitle も同時更新"""
     kwargs['updatedAt'] = datetime.now().isoformat()
     db.collection('tours').document(tour_id).update(kwargs)
+    
+    # titleが更新された場合、紐づく予約の tourTitle も更新
+    if 'title' in kwargs:
+        new_title = kwargs['title']
+        reservations = db.collection('reservations').where('tour_id', '==', tour_id).stream()
+        batch = db.batch()
+        for res_doc in reservations:
+            batch.update(res_doc.reference, {'tourTitle': new_title})
+        batch.commit()
+    
     return True
 
 def delete_tour(tour_id):

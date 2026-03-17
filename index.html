@@ -83,7 +83,7 @@
                     <div class="mb-4">
                         <label class="block text-sm font-bold mb-1 text-gray-600">郵便番号</label>
                         <div class="flex gap-2">
-                            <input type="text" id="input-zip" class="w-1/2 border-2 border-gray-300 p-3 rounded-lg bg-white">
+                            <input type="text" id="input-zip" inputmode="numeric" pattern="[0-9-]*" autocomplete="postal-code" maxlength="8" class="w-1/2 border-2 border-gray-300 p-3 rounded-lg bg-white" placeholder="123-4567" oninput="enforceNumericZip(this)">
                             <button type="button" id="btn-zip-search" onclick="searchAddressByZip()" class="w-1/2 bg-gray-200 text-black font-bold rounded-lg border-2 border-gray-300 text-sm">住所検索</button>
                         </div>
                     </div>
@@ -513,6 +513,14 @@
             } catch (err) {
                 console.error("乗車地情報読み込み失敗:", err);
                 PICKUP_OPTIONS = getDefaultPickups();
+            }
+        }
+
+        function enforceNumericZip(input) {
+            const value = input.value || '';
+            const cleaned = value.replace(/[^0-9\-]/g, '');
+            if (value !== cleaned) {
+                input.value = cleaned;
             }
         }
 

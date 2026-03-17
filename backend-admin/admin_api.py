@@ -2,7 +2,7 @@ from flask import request, jsonify
 from datetime import datetime
 from auth import require_auth, generate_token, validate_password
 from db import (
-    get_reservations_with_filters, get_reservation, update_reservation_status, create_manual_reservation,
+    get_reservations_with_filters, get_reservation, update_reservation_status, create_manual_reservation, delete_reservation,
     get_tours, get_tour, create_tour, update_tour, delete_tour,
     get_pickups, create_pickup, update_pickup, delete_pickup,
     cleanup_old_cancelled_reservations,
@@ -195,6 +195,8 @@ def create_reservation_api():
         preferred_seats = data.get('preferred_seats', [])
         total_price = data.get('total_price', 0)
         remark = data.get('remark', '')
+        special_member = bool(data.get('special_member', False))
+        member_discount_total = int(data.get('member_discount_total', 0) or 0)
         
         # 入力値チェック
         if not all([tour_id, date, tour_title]):
@@ -214,11 +216,25 @@ def create_reservation_api():
         
         # 手入力予約作成（LINE通知なし）
         reservation_id = create_manual_reservation(
-            tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark
+            tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark,
+            special_member=special_member, member_discount_total=member_discount_total
         )
         
         return jsonify({'id': reservation_id, 'message': 'Reservation created'}), 201
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@require_auth
+def delete_reservation_api(reservation_id):
+    """
+    DELETE /api/admin/reservations/{id}
+    """
+    try:
+        success = delete_reservation(reservation_id)
+        if not success:
+            return jsonify({'error': 'reservation not found'}), 404
+        return jsonify({'message': 'Reservation deleted'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

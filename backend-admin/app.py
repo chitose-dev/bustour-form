@@ -3,7 +3,7 @@ import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from admin_api import (
-    login, change_password, get_reservations_api, update_reservation_api, create_reservation_api,
+    login, change_password, get_reservations_api, update_reservation_api, create_reservation_api, delete_reservation_api,
     get_tours_api, create_tour_api, update_tour_api, delete_tour_api,
     get_pickups_api, create_pickup_api, update_pickup_api, delete_pickup_api,
     upload_image_api
@@ -38,6 +38,10 @@ def create_reservation_route():
 @app.route('/api/admin/reservations/<reservation_id>', methods=['PATCH'])
 def update_reservation_route(reservation_id):
     return update_reservation_api(reservation_id)
+
+@app.route('/api/admin/reservations/<reservation_id>', methods=['DELETE'])
+def delete_reservation_route(reservation_id):
+    return delete_reservation_api(reservation_id)
 
 # ---------------------------------
 # ツアーエンドポイント
