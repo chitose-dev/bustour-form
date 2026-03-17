@@ -82,12 +82,21 @@ function getProgressMeta(progressKey) {
     return { label: '発送', className: 'text-green-600 bg-green-50' };
 }
 
+function resolvePickupName(idOrName) {
+    if (!idOrName) return null;
+    // cachedPickupsのIDと照合
+    var found = cachedPickups.find(function(p) { return p.id === idOrName; });
+    if (found) return found.name || found.displayName || idOrName;
+    return idOrName; // IDでなければそのまま
+}
+
 function formatPickupsDisplay(r) {
     var pickups = Array.isArray(r.pickups) ? r.pickups.filter(Boolean) : [];
     if (pickups.length === 0) return r.pickup || '-';
-    var unique = pickups.filter(function(v, i, a) { return a.indexOf(v) === i; });
+    var resolved = pickups.map(resolvePickupName).filter(Boolean);
+    var unique = resolved.filter(function(v, i, a) { return a.indexOf(v) === i; });
     if (unique.length === 1) return unique[0];
-    return pickups.join(', ');
+    return resolved.join(', ');
 }
 
 // ==========================================
@@ -412,7 +421,7 @@ function downloadCSV() {
             r.phone || '',
             r.address || '',
             r.count,
-            r.pickup || '',
+            formatPickupsDisplay(r),
             r.seat_pref || 'なし',
             r.amount,
             statusLabel,
@@ -497,7 +506,7 @@ function loadReservations() {
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.pickup || '-') + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
