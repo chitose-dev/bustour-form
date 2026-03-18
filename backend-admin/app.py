@@ -6,7 +6,8 @@ from admin_api import (
     login, change_password, get_reservations_api, update_reservation_api, create_reservation_api, delete_reservation_api,
     get_tours_api, create_tour_api, update_tour_api, delete_tour_api,
     get_pickups_api, create_pickup_api, update_pickup_api, delete_pickup_api,
-    upload_image_api
+    upload_image_api,
+    get_customer_memo_api, set_customer_memo_api
 )
 from line_api import verify_webhook_signature, handle_webhook_event
 
@@ -87,6 +88,17 @@ def delete_pickup_route(pickup_id):
 @app.route('/api/admin/images/upload', methods=['POST'])
 def upload_image_route():
     return upload_image_api()
+
+# ---------------------------------
+# 顧客メモエンドポイント
+# ---------------------------------
+@app.route('/api/admin/customer-memos/<line_user_id>', methods=['GET'])
+def get_customer_memo_route(line_user_id):
+    return get_customer_memo_api(line_user_id)
+
+@app.route('/api/admin/customer-memos/<line_user_id>', methods=['POST'])
+def set_customer_memo_route(line_user_id):
+    return set_customer_memo_api(line_user_id)
 
 # ---------------------------------
 # LINE Webhookエンドポイント

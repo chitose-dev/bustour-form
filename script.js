@@ -473,6 +473,16 @@ function loadReservations() {
     } else if (sortKey === 'status') {
         var statusOrder = { pending: 0, confirmed: 1, waitlist: 2, cancelled: 3 };
         filtered.sort(function(a, b) { return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0); });
+    } else if (sortKey === 'pickup') {
+        // 乗車地順: cachedPickupsのsortOrder順、乗車地なしは末尾
+        function getPickupSortOrder(r) {
+            var pickups = Array.isArray(r.pickups) ? r.pickups : [];
+            if (pickups.length === 0) return 9999;
+            var firstPickup = pickups[0];
+            var found = cachedPickups.find(function(p) { return p.id === firstPickup || p.name === firstPickup; });
+            return found ? (found.sortOrder || 0) : 9998;
+        }
+        filtered.sort(function(a, b) { return getPickupSortOrder(a) - getPickupSortOrder(b); });
     } else {
         filtered.sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
     }
@@ -504,10 +514,8 @@ function loadReservations() {
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]">' + tourName + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></td>'
@@ -582,9 +590,20 @@ function showReservationDetail(id) {
         + '<option value="waitlist"' + (r.status === 'waitlist' ? ' selected' : '') + '>【キャンセル待ち】</option>'
         + '</select>'
         + '<button onclick="saveDetailStatus(\'' + r.id + '\');" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded text-sm">ステータスを保存</button>'
+        + '</div>'
+        + '<div class="mt-3 p-3 border rounded bg-white" id="memo-section">'
+        + '<label class="block text-sm font-bold mb-2">顧客メモ</label>'
+        + '<textarea id="customer-memo-input" class="w-full border p-2 rounded text-sm" rows="3" placeholder="このお客様へのメモを入力..."></textarea>'
+        + (r.lineUserId
+            ? '<p class="text-xs text-gray-500 mt-1">LINE予約: 同じLINE IDでの次回予約でも引き継がれます</p>'
+            : '<p class="text-xs text-gray-500 mt-1">手動予約: この予約のみに保存されます</p>')
+        + '<button onclick="saveCustomerMemo(\'' + r.id + '\', \'' + (r.lineUserId || '') + '\');" class="mt-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm">メモを保存</button>'
         + '</div>';
 
     openModal('modal-reservation-detail');
+
+    // 顧客メモをロード
+    loadCustomerMemo(r.id, r.lineUserId);
 }
 
 async function updateReservationProgress(id, progressStatus) {
@@ -651,6 +670,70 @@ async function updateReservationStatus(id, newStatus) {
             console.error(err);
             alert('通信エラーが発生しました');
         }
+    }
+}
+
+// 顧客メモ読み込み
+async function loadCustomerMemo(reservationId, lineUserId) {
+    const input = document.getElementById('customer-memo-input');
+    if (!input) return;
+    if (USE_MOCK) return;
+    try {
+        if (lineUserId) {
+            // LINE予約: customer_memosコレクションから取得
+            const res = await fetch(`${API_BASE_URL}/customer-memos/${lineUserId}`, {
+                headers: getAuthHeaders()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                input.value = data.memo || '';
+            }
+        } else {
+            // 手動予約: 予約の manualMemo フィールドから取得
+            const r = cachedReservations.find(function(x) { return x.id === reservationId; });
+            input.value = (r && r.manualMemo) || '';
+        }
+    } catch (e) {
+        console.error('メモ読み込みエラー:', e);
+    }
+}
+
+// 顧客メモ保存
+async function saveCustomerMemo(reservationId, lineUserId) {
+    const input = document.getElementById('customer-memo-input');
+    if (!input) return;
+    const memo = input.value;
+    if (USE_MOCK) { alert('メモを保存しました（モック）'); return; }
+    try {
+        let res;
+        if (lineUserId) {
+            // LINE予約: customer_memosコレクションに保存（永続）
+            res = await fetch(`${API_BASE_URL}/customer-memos/${lineUserId}`, {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ memo })
+            });
+        } else {
+            // 手動予約: この予約のmanualMemoフィールドに保存
+            res = await fetch(`${API_BASE_URL}/reservations/${reservationId}`, {
+                method: 'PATCH',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ manualMemo: memo })
+            });
+        }
+        if (res && res.ok) {
+            alert('メモを保存しました');
+            // cachedReservationsのmanualMemoも更新
+            if (!lineUserId) {
+                const r = cachedReservations.find(function(x) { return x.id === reservationId; });
+                if (r) r.manualMemo = memo;
+            }
+        } else {
+            const err = await res.json().catch(() => ({}));
+            alert('保存失敗: ' + (err.error || 'エラー'));
+        }
+    } catch (e) {
+        alert('保存中にエラーが発生しました: ' + e.message);
     }
 }
 

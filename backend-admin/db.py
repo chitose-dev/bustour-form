@@ -84,7 +84,7 @@ def delete_reservation(reservation_id):
     delete_with_inventory(transaction)
     return True
 
-def update_reservation_status(reservation_id, new_status=None, progress_status=None, remark=None):
+def update_reservation_status(reservation_id, new_status=None, progress_status=None, remark=None, manual_memo=None):
     """予約更新（status / progressStatus / remark）- キャンセル時は在庫を確実に復元"""
     res_doc = db.collection('reservations').document(reservation_id).get()
     if not res_doc.exists:
@@ -128,6 +128,8 @@ def update_reservation_status(reservation_id, new_status=None, progress_status=N
             update_payload['progressStatus'] = progress_status
         if remark is not None:
             update_payload['remark'] = remark
+        if manual_memo is not None:
+            update_payload['manualMemo'] = manual_memo
 
         transaction.update(res_ref, update_payload)
         
@@ -428,3 +430,26 @@ def cleanup_old_cancelled_reservations(months=3):
     except Exception as e:
         print(f"キャンセル予約クリーンアップエラー: {e}")
         return 0
+
+# ---------------------------------
+# 顧客メモ操作
+# ---------------------------------
+def get_customer_memo(line_user_id):
+    """LINE USER IDに紐づく顧客メモを取得"""
+    if not line_user_id:
+        return None
+    doc = db.collection('customer_memos').document(line_user_id).get()
+    if not doc.exists:
+        return None
+    return doc.to_dict().get('memo', '')
+
+def set_customer_memo(line_user_id, memo):
+    """LINE USER IDに紐づく顧客メモを保存（永続）"""
+    if not line_user_id:
+        return False
+    db.collection('customer_memos').document(line_user_id).set({
+        'lineUserId': line_user_id,
+        'memo': memo,
+        'updatedAt': datetime.now().isoformat()
+    }, merge=True)
+    return True

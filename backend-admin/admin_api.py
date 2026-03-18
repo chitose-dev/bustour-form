@@ -6,7 +6,8 @@ from db import (
     get_tours, get_tour, create_tour, update_tour, delete_tour,
     get_pickups, create_pickup, update_pickup, delete_pickup,
     cleanup_old_cancelled_reservations,
-    set_special_member_for_reservation
+    set_special_member_for_reservation,
+    get_customer_memo, set_customer_memo
 )
 from pricing import calculate_total_price, aggregate_reservations
 from line_api import send_cancellation_notification
@@ -136,16 +137,18 @@ def update_reservation_api(reservation_id):
         progress_status = data.get('progressStatus')
         remark = data.get('remark')
         special_member = data.get('specialMember')
+        manual_memo = data.get('manualMemo')
 
-        if new_status is None and progress_status is None and remark is None and special_member is None:
-            return jsonify({'error': 'status or progressStatus or remark or specialMember required'}), 400
+        if new_status is None and progress_status is None and remark is None and special_member is None and manual_memo is None:
+            return jsonify({'error': 'status or progressStatus or remark or specialMember or manualMemo required'}), 400
 
-        if new_status is not None or progress_status is not None or remark is not None:
+        if new_status is not None or progress_status is not None or remark is not None or manual_memo is not None:
             success = update_reservation_status(
                 reservation_id,
                 new_status=new_status,
                 progress_status=progress_status,
-                remark=remark
+                remark=remark,
+                manual_memo=manual_memo
             )
             if not success:
                 return jsonify({'error': 'reservation not found'}), 404
@@ -208,8 +211,14 @@ def create_reservation_api():
             return jsonify({'error': 'tour not found'}), 404
         
         capacity = tour_doc.get('capacity', 0)
-        reservations = get_reservations_with_filters(status='confirmed')
-        current_count = sum(r.get('passengers', 0) for r in reservations if r.get('tour_id') == tour_id and r.get('date') == date)
+        # confirmed と pending 両方をカウント（pending漏れ修正）
+        confirmed_reservations = get_reservations_with_filters(status='confirmed')
+        pending_reservations = get_reservations_with_filters(status='pending')
+        current_count = sum(
+            r.get('passengers', 0)
+            for r in confirmed_reservations + pending_reservations
+            if r.get('tour_id') == tour_id and r.get('date') == date
+        )
         
         if current_count + passengers > capacity:
             return jsonify({'error': 'capacity exceeded'}), 400
@@ -465,5 +474,35 @@ def upload_image_api():
         return jsonify({'error': 'imgur request timeout'}), 504
     except requests.RequestException as e:
         return jsonify({'error': f'network error: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ---------------------------------
+# 顧客メモ
+# ---------------------------------
+@require_auth
+def get_customer_memo_api(line_user_id):
+    """
+    GET /api/admin/customer-memos/<line_user_id>
+    LINE USER IDに紐づくメモを取得
+    """
+    try:
+        memo = get_customer_memo(line_user_id)
+        return jsonify({'lineUserId': line_user_id, 'memo': memo or ''}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@require_auth
+def set_customer_memo_api(line_user_id):
+    """
+    POST /api/admin/customer-memos/<line_user_id>
+    {memo: string}
+    LINE USER IDに紐づくメモを保存（LINE予約: 永続保存）
+    """
+    try:
+        data = request.get_json()
+        memo = data.get('memo', '')
+        set_customer_memo(line_user_id, memo)
+        return jsonify({'message': 'memo saved'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
