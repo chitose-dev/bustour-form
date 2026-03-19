@@ -21,7 +21,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-gray-100 text-black font-sans antialiased h-safe-screen flex flex-col overflow-hidden">
@@ -170,15 +170,17 @@
                         <thead class="bg-gray-100 border-b-2 border-gray-300">
                             <tr>
                                 <!-- <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm">LINE ID</th> -->
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">ツアー日</th>
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">ツアー名</th>
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">氏名</th>
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">人数</th>
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">乗車地</th>
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">金額</th>
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">状態</th>
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">最新進捗</th>
-                                <th class="p-2 lg:p-3 font-bold text-gray-600 text-sm whitespace-nowrap">操作</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">ツアー日</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">ツアー名</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">氏名</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">LINE表示名</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">人数</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">乗車地</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">前列</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">金額</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">状態</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">最新進捗</th>
+                                <th class="p-3 lg:p-4 font-bold text-gray-600 text-sm whitespace-nowrap">操作</th>
                             </tr>
                         </thead>
                         <tbody id="reservations-table-body" class="divide-y divide-gray-100">
@@ -313,14 +315,13 @@
 
     <!-- 手動予約追加モーダル -->
     <div id="modal-add-reservation" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 lg:p-8 rounded-xl w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div class="bg-white p-6 lg:p-8 rounded-xl w-full max-w-xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <h3 class="text-xl font-bold mb-4 border-b pb-2">手動予約追加 (電話/メール)</h3>
             <form id="form-manual-reservation" onsubmit="event.preventDefault(); submitManualReservation();">
-                <div class="space-y-4">
+                <div id="manual-step-1" class="space-y-4">
                     <div>
                         <label class="block font-bold text-sm mb-1">ツアー選択</label>
-                        <select id="manual-tour-id" class="w-full border p-2 rounded bg-white" required>
-                            </select>
+                        <select id="manual-tour-id" class="w-full border p-2 rounded bg-white" required></select>
                     </div>
                     <div>
                         <label class="block font-bold text-sm mb-1">氏名</label>
@@ -334,15 +335,9 @@
                         <label class="block font-bold text-sm mb-1">住所</label>
                         <input type="text" id="manual-address" class="w-full border p-2 rounded" placeholder="例: 東京都新宿区...">
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block font-bold text-sm mb-1">人数</label>
-                            <input type="number" id="manual-count" class="w-full border p-2 rounded" min="1" value="1" required>
-                        </div>
-                        <div>
-                            <label class="block font-bold text-sm mb-1">合計金額</label>
-                            <input type="number" id="manual-price" class="w-full border p-2 rounded" placeholder="自動計算なし" required>
-                        </div>
+                    <div>
+                        <label class="block font-bold text-sm mb-1">人数</label>
+                        <input type="number" id="manual-count" class="w-full border p-2 rounded" min="1" value="1" required>
                     </div>
                     <div>
                         <label class="block font-bold text-sm mb-1">乗車地（複数選択可）</label>
@@ -357,10 +352,51 @@
                             <option value="あり">あり（全員分）</option>
                         </select>
                     </div>
+                    <div class="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                        <label class="flex items-center gap-2 text-sm font-bold text-blue-900">
+                            <input type="checkbox" id="manual-special-member" class="w-4 h-4">
+                            <span>特別会員（1人あたり300円引き）</span>
+                        </label>
+                    </div>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button type="button" onclick="closeModal('modal-add-reservation')" class="px-4 py-2 bg-gray-200 rounded font-bold">キャンセル</button>
+                        <button type="button" onclick="showManualReservationPreview()" class="px-6 py-2 bg-primary font-bold rounded shadow hover:bg-yellow-400">金額を計算</button>
+                    </div>
                 </div>
-                <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" onclick="closeModal('modal-add-reservation')" class="px-4 py-2 bg-gray-200 rounded font-bold">キャンセル</button>
-                    <button type="submit" class="px-6 py-2 bg-primary font-bold rounded shadow hover:bg-yellow-400">登録</button>
+
+                <div id="manual-step-2" class="hidden space-y-4">
+                    <div class="rounded-lg border bg-gray-50 p-4">
+                        <h4 class="font-bold mb-3">入力内容</h4>
+                        <div id="manual-preview-summary" class="space-y-2 text-sm text-gray-700"></div>
+                    </div>
+                    <div class="rounded-lg border bg-white p-4 space-y-3">
+                        <h4 class="font-bold">金額内訳</h4>
+                        <div class="flex justify-between text-sm">
+                            <span>1人あたり基本料金</span>
+                            <span id="manual-breakdown-base-unit" class="font-bold">¥0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>基本料金合計</span>
+                            <span id="manual-breakdown-base-total" class="font-bold">¥0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>前列座席指定料</span>
+                            <span id="manual-breakdown-seat" class="font-bold">¥0</span>
+                        </div>
+                        <div id="manual-breakdown-discount-row" class="hidden flex justify-between text-sm">
+                            <span class="text-green-600">特別会員割引</span>
+                            <span id="manual-breakdown-discount" class="font-bold text-green-600">-¥0</span>
+                        </div>
+                        <div class="border-t pt-3">
+                            <label class="block font-bold text-sm mb-1">合計金額</label>
+                            <input type="number" id="manual-confirm-price" class="w-full border p-2 rounded text-lg font-bold" min="0" required>
+                            <p class="mt-1 text-xs text-gray-500">必要に応じて自由に変更できます</p>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button type="button" onclick="backToManualReservationForm()" class="px-4 py-2 bg-gray-200 rounded font-bold">戻る</button>
+                        <button type="submit" class="px-6 py-2 bg-primary font-bold rounded shadow hover:bg-yellow-400">登録</button>
+                    </div>
                 </div>
                 <p class="text-xs text-red-500 mt-2 text-center">※手動予約はLINE通知が送信されません</p>
             </form>
@@ -445,6 +481,6 @@
         </div>
     </div>
 
-    <script>document.write('<script src="script.js?v=' + Date.now() + '"><\/script>');</script>
+    <script>document.write('<script src="/script.js?v=' + Date.now() + '"><\/script>');</script>
 </body>
 </html>
