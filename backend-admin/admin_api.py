@@ -129,7 +129,7 @@ def get_reservations_api():
 def update_reservation_api(reservation_id):
     """
     PATCH /api/admin/reservations/{id}
-    {status, progressStatus, remark, specialMember, manualMemo, progressLog, name, phone, address, passengers, pickup, pickups, seatPref, totalPrice}
+    {status, progressStatus, remark, specialMember, manualMemo, name, phone, address, passengers, pickup, pickups, seatPref, totalPrice}
     """
     try:
         data = request.get_json()
@@ -138,7 +138,6 @@ def update_reservation_api(reservation_id):
         remark = data.get('remark')
         special_member = data.get('specialMember')
         manual_memo = data.get('manualMemo')
-        progress_log = data.get('progressLog')
         name = data.get('name')
         phone = data.get('phone')
         address = data.get('address')
@@ -150,14 +149,12 @@ def update_reservation_api(reservation_id):
 
         if (
             new_status is None and progress_status is None and remark is None and special_member is None and manual_memo is None
-            and progress_log is None
             and name is None and phone is None and address is None and passengers is None and pickup is None and pickups is None and seat_pref is None and total_price is None
         ):
             return jsonify({'error': 'at least one updatable field is required'}), 400
 
         if (
             new_status is not None or progress_status is not None or remark is not None or manual_memo is not None
-            or progress_log is not None
             or name is not None or phone is not None or address is not None or passengers is not None or pickup is not None or pickups is not None or seat_pref is not None or total_price is not None
         ):
             success = update_reservation_status(
@@ -166,7 +163,6 @@ def update_reservation_api(reservation_id):
                 progress_status=progress_status,
                 remark=remark,
                 manual_memo=manual_memo,
-                progress_log=progress_log,
                 name=name,
                 phone=phone,
                 address=address,
