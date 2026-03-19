@@ -56,7 +56,7 @@ function normalizeReservation(reservation) {
         name: reservation.name || userInfo.name || '',
         phone: reservation.phone || userInfo.phone || '',
         address: reservation.address || `${userInfo.pref || ''}${userInfo.city || ''}${userInfo.street || ''}`,
-        count: Number(reservation.count ?? reservation.passengers ?? 0),
+        count: Number(reservation.passengers ?? reservation.count ?? 0),
         amount: Number(reservation.amount ?? reservation.totalPrice ?? 0),
         specialMember: !!reservation.specialMember,
         memberDiscountTotal: Number(reservation.memberDiscountTotal ?? 0),

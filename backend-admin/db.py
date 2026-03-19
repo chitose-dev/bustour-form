@@ -156,6 +156,7 @@ def update_reservation_status(
         if passengers is not None:
             normalized_passengers = max(int(passengers), 1)
             update_payload['passengers'] = normalized_passengers
+            update_payload['count'] = normalized_passengers
 
         if pickup is not None:
             update_payload['pickup'] = str(pickup)
