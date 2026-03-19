@@ -68,7 +68,7 @@ function normalizeReservation(reservation) {
         pickups: pickups,
         seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし'),
         createdAt: reservation.createdAt || '',
-        progressLog: reservation.progressLog || null,
+        progressLog: Array.isArray(reservation.progressLog) ? reservation.progressLog : [],
         manualMemo: reservation.manualMemo || ''
     };
 }
@@ -723,30 +723,45 @@ function loadReservations() {
     tbody.innerHTML = '';
     filtered.forEach(function(r) {
         const tr = document.createElement('tr');
-        tr.className = 'cursor-pointer hover:bg-gray-50';
+        tr.className = 'hover:bg-gray-50';
+        tr.dataset.resId = r.id;
         const statusMeta = getStatusMeta(r.status);
         const progressMeta = getProgressMeta(r.progressStatus);
-        // ツアー名はcachedToursから最新を取得
         const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
         const tourName = tourObj ? tourObj.title : r.tour_name;
-
         const memberMark = r.specialMember ? ' <span class="text-xs text-blue-600 font-bold">★会員</span>' : '';
 
-        tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
-            + '<td class="p-3 lg:p-4 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]">' + tourName + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
-            + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
-            + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></td>'
-            + '<td class="p-3 lg:p-4 border-b space-x-1 whitespace-nowrap">'
-            + '<button onclick="event.stopPropagation(); showReservationDetail(\'' + r.id + '\')" class="text-blue-600 underline text-xs lg:text-sm">詳細</button>'
+        // 最新progressLog エントリーを取得
+        const pLogs = Array.isArray(r.progressLog) ? r.progressLog : [];
+        const latestLog = pLogs.length > 0 ? pLogs[pLogs.length - 1] : null;
+        const latestLogHtml = latestLog
+            ? '<span class="px-1 py-0.5 rounded text-xs font-bold ' + getProgressMeta(latestLog.status).className + '">' + getProgressMeta(latestLog.status).label + '</span>'
+              + ' <span class="text-xs text-gray-500">' + (latestLog.method || '') + '</span>'
+              + (latestLog.memo ? ' <span class="text-xs text-gray-400">' + latestLog.memo.substring(0, 12) + (latestLog.memo.length > 12 ? '…' : '') + '</span>' : '')
+            : '<span class="text-xs text-gray-400">-</span>';
+
+        tr.innerHTML = '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
+            + '<td class="p-2 lg:p-3 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[180px]">' + tourName + '</td>'
+            + '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
+            + '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
+            + '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
+            + '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
+            + '<td class="p-2 lg:p-3 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
+            + '<td class="p-2 lg:p-3 border-b whitespace-nowrap">' + latestLogHtml + '</td>'
+            + '<td class="p-2 lg:p-3 border-b space-x-1 whitespace-nowrap">'
+            + '<button onclick="event.stopPropagation(); toggleProgressRow(\'' + r.id + '\')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-200">記録</button>'
+            + ' <button onclick="event.stopPropagation(); showReservationDetail(\'' + r.id + '\')" class="text-blue-600 underline text-xs">詳細</button>'
             + '</td>';
-        tr.onclick = function() { showReservationDetail(r.id); };
         tbody.appendChild(tr);
+
+        // インライン展開行（初期非表示）
+        const expandTr = document.createElement('tr');
+        expandTr.id = 'progress-row-' + r.id;
+        expandTr.style.display = 'none';
+        expandTr.innerHTML = '<td colspan="9" class="border-b bg-indigo-50 p-3">'
+            + _inlineProgressForm(r)
+            + '</td>';
+        tbody.appendChild(expandTr);
     });
 
     // ツアー絞り込み時に旅行日・ツアー名列を非表示
@@ -782,7 +797,7 @@ function showReservationDetail(id) {
     const progressMeta = getProgressMeta(r.progressStatus);
     const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
     const tourName = tourObj ? tourObj.title : r.tour_name;
-    const pLog = r.progressLog || {};
+    const pLogs = Array.isArray(r.progressLog) ? r.progressLog : [];
 
     // ── ヘッダー情報 ──────────────────────────────────────
     const headerHtml = ''
@@ -888,25 +903,25 @@ function showReservationDetail(id) {
         + '<input type="text" id="progress-status-other-input" class="w-full border p-2 rounded text-sm mb-2" placeholder="状態を入力" value="' + (isOther ? r.progressStatus : '') + '" style="display:' + (isOther ? 'block' : 'none') + '">'
         + '<button onclick="saveProgressStatus(\'' + r.id + '\');" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded text-sm">進捗ステータスを保存</button>'
         + '</div>'
-        // 状態管理テーブル
+        // 状態管理ログ履歴
         + '<div class="p-3 border rounded bg-white">'
         + '<label class="block text-sm font-bold mb-3">状態管理ログ（この予約専用）</label>'
-        + '<div class="overflow-x-auto">'
-        + '<table class="w-full text-sm border-collapse">'
-        + '<thead><tr class="bg-gray-100">'
-        + '<th class="border p-2 text-left text-xs font-bold text-gray-600 w-16">項目</th>'
-        + '<th class="border p-2 text-left text-xs font-bold text-gray-600">メモ</th>'
-        + '<th class="border p-2 text-left text-xs font-bold text-gray-600 w-24">担当者</th>'
-        + '<th class="border p-2 text-left text-xs font-bold text-gray-600 w-32">日時</th>'
-        + '</tr></thead>'
-        + '<tbody>'
-        + _progressLogRow('middle', '中間', pLog)
-        + _progressLogRow('shipping', '発送', pLog)
-        + _progressLogRow('final', '最終', pLog)
-        + '</tbody>'
-        + '</table>'
-        + '</div>'
-        + '<button onclick="saveProgressLog(\'' + r.id + '\');" class="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-sm">状態管理ログを保存</button>'
+        + (function() {
+            if (!pLogs.length) return '<div class="text-xs text-gray-400 p-2">まだ記録がありません。台帳の「記録」ボタンから入力できます。</div>';
+            return '<div class="space-y-2">'
+                + pLogs.slice().reverse().map(function(entry) {
+                    const m = getProgressMeta(entry.status);
+                    const dt = entry.updatedAt ? entry.updatedAt.substring(0, 16).replace('T', ' ') : '';
+                    return '<div class="flex flex-wrap gap-2 items-center text-sm border-b pb-2">'
+                        + '<span class="px-2 py-0.5 rounded text-xs font-bold ' + m.className + '">' + m.label + '</span>'
+                        + '<span class="text-gray-600 text-xs">' + (entry.method || '-') + '</span>'
+                        + '<span class="flex-1 text-gray-700 text-xs">' + (entry.memo || '') + '</span>'
+                        + '<span class="text-gray-400 text-xs">' + dt + '</span>'
+                        + '</div>';
+                }).join('')
+                + '</div>';
+        })()
+        + '<p class="text-xs text-gray-400 mt-2">記録の追加・編集は台帳の「記録」ボタンから行えます。</p>'
         + '</div>'
         + '</div>'
         + '</div>';
@@ -918,6 +933,122 @@ function showReservationDetail(id) {
     initReservationPickupEditor(r);
     syncReservationAmountByInputs(id, false);
     if (r.lineUserId) loadCustomerMemo(r.lineUserId);
+}
+
+// ── インライン進捗入力フォーム ──────────────────────────────
+function _inlineProgressForm(r) {
+    const pLogs = Array.isArray(r.progressLog) ? r.progressLog : [];
+    const STATUS_OPTIONS = [
+        {v:'shipping', l:'発送'}, {v:'middle', l:'中間'}, {v:'final', l:'最終'}, {v:'check', l:'要確認'}
+    ];
+    const METHOD_OPTIONS = ['電話', '個人LINE', '公式LINE', 'メール', 'その他'];
+    const currentStatus = r.progressStatus || 'shipping';
+
+    let statusOpts = STATUS_OPTIONS.map(function(o) {
+        return '<option value="' + o.v + '"' + (o.v === currentStatus ? ' selected' : '') + '>' + o.l + '</option>';
+    }).join('');
+    let methodOpts = METHOD_OPTIONS.map(function(m) {
+        return '<option value="' + m + '">' + m + '</option>';
+    }).join('');
+
+    // 入力フォーム（上部）
+    let formHtml = '<div class="flex flex-wrap gap-2 items-center mb-2">'
+        + '<select id="inline-status-' + r.id + '" class="border p-1.5 rounded text-sm bg-white">' + statusOpts + '</select>'
+        + '<select id="inline-method-' + r.id + '" class="border p-1.5 rounded text-sm bg-white">' + methodOpts + '</select>'
+        + '<input type="text" id="inline-memo-' + r.id + '" class="border p-1.5 rounded text-sm flex-1 min-w-[120px]" placeholder="メモ（任意）">'
+        + '<button onclick="saveInlineProgress(\'' + r.id + '\')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded font-bold">保存</button>'
+        + '<button onclick="toggleProgressRow(\'' + r.id + '\')" class="px-2 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-600 text-sm rounded">✕</button>'
+        + '</div>';
+
+    // 履歴（下部）
+    let historyHtml = '';
+    if (pLogs.length > 0) {
+        historyHtml = '<div class="text-xs text-gray-500 mb-1 font-bold">履歴</div>'
+            + '<div class="space-y-1">';
+        pLogs.slice().reverse().forEach(function(entry) {
+            const m = getProgressMeta(entry.status);
+            const dt = entry.updatedAt ? entry.updatedAt.substring(0, 16).replace('T', ' ') : '';
+            historyHtml += '<div class="flex gap-2 items-center text-xs">'
+                + '<span class="px-1.5 py-0.5 rounded font-bold ' + m.className + '">' + m.label + '</span>'
+                + '<span class="text-gray-600">' + (entry.method || '') + '</span>'
+                + '<span class="text-gray-500">' + (entry.memo || '') + '</span>'
+                + '<span class="text-gray-400 ml-auto">' + dt + '</span>'
+                + '</div>';
+        });
+        historyHtml += '</div>';
+    } else {
+        historyHtml = '<div class="text-xs text-gray-400">まだ記録がありません</div>';
+    }
+
+    return formHtml + '<hr class="my-2">' + historyHtml;
+}
+
+// インライン展開トグル
+function toggleProgressRow(id) {
+    const row = document.getElementById('progress-row-' + id);
+    if (!row) return;
+    if (row.style.display === 'none') {
+        row.style.display = '';
+        // フォームを最新状態で再描画
+        const r = cachedReservations.find(function(x) { return x.id === id; }) || cachedWaitlist.find(function(x) { return x.id === id; });
+        if (r) row.querySelector('td').innerHTML = _inlineProgressForm(r);
+    } else {
+        row.style.display = 'none';
+    }
+}
+
+// インライン進捗保存
+async function saveInlineProgress(id) {
+    const statusSel = document.getElementById('inline-status-' + id);
+    const methodSel = document.getElementById('inline-method-' + id);
+    const memoInput = document.getElementById('inline-memo-' + id);
+    if (!statusSel) return;
+
+    const newEntry = {
+        status: statusSel.value,
+        method: methodSel ? methodSel.value : '',
+        memo: memoInput ? memoInput.value.trim() : '',
+        updatedAt: new Date().toISOString().substring(0, 16)
+    };
+
+    const r = cachedReservations.find(function(x) { return x.id === id; }) || cachedWaitlist.find(function(x) { return x.id === id; });
+    if (!r) return;
+
+    // 同一ステータスは上書き、それ以外は追加
+    let pLogs = Array.isArray(r.progressLog) ? r.progressLog.slice() : [];
+    const existingIdx = pLogs.findIndex(function(e) { return e.status === newEntry.status; });
+    if (existingIdx >= 0) {
+        pLogs[existingIdx] = newEntry;
+    } else {
+        pLogs.push(newEntry);
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ progressStatus: newEntry.status, progressLog: pLogs })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        // キャッシュ更新
+        r.progressLog = pLogs;
+        r.progressStatus = newEntry.status;
+        if (memoInput) memoInput.value = '';
+        // 展開行のフォームを再描画
+        const row = document.getElementById('progress-row-' + id);
+        if (row) row.querySelector('td').innerHTML = _inlineProgressForm(r);
+        // テーブル行の最新進捗セルも更新
+        const mainTr = document.querySelector('tr[data-res-id="' + id + '"]');
+        if (mainTr) {
+            const cells = mainTr.querySelectorAll('td');
+            const latestLogHtml = '<span class="px-1 py-0.5 rounded text-xs font-bold ' + getProgressMeta(newEntry.status).className + '">' + getProgressMeta(newEntry.status).label + '</span>'
+                + ' <span class="text-xs text-gray-500">' + (newEntry.method || '') + '</span>'
+                + (newEntry.memo ? ' <span class="text-xs text-gray-400">' + newEntry.memo.substring(0, 12) + '</span>' : '');
+            if (cells[7]) cells[7].innerHTML = latestLogHtml;
+        }
+    } catch (e) {
+        alert('保存失敗: ' + e.message);
+    }
 }
 
 // 状態管理ログの行HTML生成
