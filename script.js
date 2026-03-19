@@ -700,6 +700,15 @@ function loadReservations() {
     } else if (sortKey === 'status') {
         var statusOrder = { pending: 0, confirmed: 1, waitlist: 2, cancelled: 3 };
         filtered.sort(function(a, b) { return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0); });
+    } else if (sortKey === 'pickup') {
+        function getPickupSortOrder(r) {
+            var pickups = Array.isArray(r.pickups) ? r.pickups : [];
+            if (pickups.length === 0) return 9999;
+            var firstPickup = pickups[0];
+            var found = cachedPickups.find(function(p) { return p.id === firstPickup || p.name === firstPickup; });
+            return found ? (found.sortOrder || 0) : 9998;
+        }
+        filtered.sort(function(a, b) { return getPickupSortOrder(a) - getPickupSortOrder(b); });
     } else {
         filtered.sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
     }
@@ -728,25 +737,35 @@ function loadReservations() {
 
         const memberMark = r.specialMember ? ' <span class="text-xs text-blue-600 font-bold">★会員</span>' : '';
 
-        tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
-            + '<td class="p-3 lg:p-4 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]">' + tourName + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
-            + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
-            + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></td>'
-            + '<td class="p-3 lg:p-4 border-b space-x-1 whitespace-nowrap">'
-            + '<button onclick="event.stopPropagation(); showReservationDetail(\'' + r.id + '\')" class="text-blue-600 underline text-xs lg:text-sm">詳細</button>'
-            + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'shipping\')" class="text-green-600 underline text-xs lg:text-sm">発送</button>' : '')
-            + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'middle\')" class="text-blue-600 underline text-xs lg:text-sm">中間</button>' : '')
-            + (r.status !== 'cancelled' ? ' <button onclick="event.stopPropagation(); updateReservationProgress(\'' + r.id + '\', \'final\')" class="text-purple-600 underline text-xs lg:text-sm">最終</button>' : '')
-            + (r.status === 'confirmed' || r.status === 'pending' ? ' <button onclick="event.stopPropagation(); updateReservationStatus(\'' + r.id + '\', \'cancelled\')" class="text-red-600 underline text-xs lg:text-sm">取消</button>' : '')
+        tr.dataset.resId = r.id;
+        const pLogs = Array.isArray(r.progressLog) ? r.progressLog : [];
+        const latestLog = pLogs.length > 0 ? pLogs[pLogs.length - 1] : null;
+        const latestLogHtml = latestLog
+            ? '<span class="px-1 py-0.5 rounded text-xs font-bold ' + getProgressMeta(latestLog.status).className + '">' + getProgressMeta(latestLog.status).label + '</span>'
+              + ' <span class="text-xs text-gray-500">' + (latestLog.method || '') + '</span>'
+              + (latestLog.memo ? ' <span class="text-xs text-gray-400">' + latestLog.memo.substring(0, 12) + (latestLog.memo.length > 12 ? '\u2026' : '') + '</span>' : '')
+            : '<span class="text-xs text-gray-400">-</span>';
+
+        tr.innerHTML = '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
+            + '<td class="p-2 lg:p-3 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[180px]">' + tourName + '</td>'
+            + '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
+            + '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">' + r.count + '\u540d</td>'
+            + '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
+            + '<td class="p-2 lg:p-3 border-b text-sm whitespace-nowrap">\u00a5' + r.amount.toLocaleString() + '</td>'
+            + '<td class="p-2 lg:p-3 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
+            + '<td class="p-2 lg:p-3 border-b whitespace-nowrap">' + latestLogHtml + '</td>'
+            + '<td class="p-2 lg:p-3 border-b space-x-1 whitespace-nowrap">'
+            + '<button onclick="event.stopPropagation(); toggleProgressRow(\'' + r.id + '\')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs rounded border border-indigo-200">\u8a18\u9332</button>'
+            + ' <button onclick="event.stopPropagation(); showReservationDetail(\'' + r.id + '\')" class="text-blue-600 underline text-xs">\u8a73\u7d30</button>'
             + '</td>';
-        tr.onclick = function() { showReservationDetail(r.id); };
         tbody.appendChild(tr);
+
+        // インライン展開行（初期非表示）
+        const expandTr = document.createElement('tr');
+        expandTr.id = 'progress-row-' + r.id;
+        expandTr.style.display = 'none';
+        expandTr.innerHTML = '<td colspan="9" class="border-b bg-indigo-50 p-3">' + _inlineProgressForm(r) + '</td>';
+        tbody.appendChild(expandTr);
     });
 
     // ツアー絞り込み時に旅行日・ツアー名列を非表示
@@ -777,60 +796,48 @@ function loadReservations() {
 function showReservationDetail(id) {
     const r = cachedReservations.find(function(x) { return x.id === id; }) || cachedWaitlist.find(function(x) { return x.id === id; });
     if (!r) return;
-    
     const statusMeta = getStatusMeta(r.status);
     const progressMeta = getProgressMeta(r.progressStatus);
-    // ツアー名はcachedToursから最新を取得
     const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
     const tourName = tourObj ? tourObj.title : r.tour_name;
-    
-    const body = document.getElementById('reservation-detail-body');
-    body.innerHTML = ''
-        + '<div class="bg-gray-50 rounded-lg p-4 space-y-3 border">'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">状態</span><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></div>'
-        + '<hr>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">ツアー名</span><span class="font-bold text-sm text-right max-w-[60%]">' + tourName + '</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">ツアー日</span><span class="font-bold text-sm">' + r.date + '</span></div>'
-        + '<hr>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">LINE ID</span><span class="font-bold text-sm text-gray-500 break-all">' + (r.lineUserId || '-') + '</span></div>'
-        + '<hr>'
+    const pLogs = Array.isArray(r.progressLog) ? r.progressLog : [];
+
+    const headerHtml = '<div class="bg-gray-50 rounded-lg px-4 py-3 border mb-3 text-sm">'
+        + '<div class="flex justify-between mb-1"><span class="text-gray-500">ツアー名</span><span class="font-bold text-right max-w-[65%]">' + tourName + '</span></div>'
+        + '<div class="flex justify-between mb-1"><span class="text-gray-500">ツアー日</span><span class="font-bold">' + r.date + '</span></div>'
+        + '<div class="flex gap-2 mt-2">'
+        + '<span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span>'
+        + '<span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span>'
+        + '</div></div>';
+
+    const tabButtonsHtml = '<div class="flex border-b mb-4">'
+        + '<button onclick="switchDetailTab(\'booking\')" id="tab-btn-booking" class="px-4 py-2 text-sm font-bold border-b-2 border-blue-500 text-blue-600">予約情報</button>'
+        + '<button onclick="switchDetailTab(\'memo\')" id="tab-btn-memo" class="px-4 py-2 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700">顧客メモ</button>'
+        + '<button onclick="switchDetailTab(\'progress\')" id="tab-btn-progress" class="px-4 py-2 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700">状態管理</button>'
+        + '</div>';
+
+    const tab1Html = '<div id="detail-tab-booking">'
+        + '<div class="space-y-3">'
+        + '<div class="text-xs text-gray-400">LINE ID: ' + (r.lineUserId || '-') + '</div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">氏名</label><input type="text" id="edit-res-name" class="w-full border p-2 rounded text-sm" value="' + (r.name || '').replace(/"/g, '&quot;') + '"></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">電話番号</label><input type="tel" id="edit-res-phone" class="w-full border p-2 rounded text-sm" value="' + (r.phone || '').replace(/"/g, '&quot;') + '"></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">住所</label><input type="text" id="edit-res-address" class="w-full border p-2 rounded text-sm" value="' + (r.address || '').replace(/"/g, '&quot;') + '"></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">人数</label><input type="number" id="edit-res-count" class="w-full border p-2 rounded text-sm" min="1" value="' + r.count + '" oninput="onReservationEditInputsChanged(\'' + r.id + '\')"></div>'
         + '<div>'
-        + '<div class="flex items-center justify-between mb-1">'
-        + '<label class="block text-gray-600 text-sm">乗車地（複数設定可）</label>'
-        + '<div class="flex gap-2">'
-        + '<button type="button" onclick="addReservationPickupRow()" class="px-2 py-1 rounded text-xs bg-white border hover:bg-gray-50">+ 行追加</button>'
-        + '<button type="button" onclick="fillPickupRowsByCount()" class="px-2 py-1 rounded text-xs bg-white border hover:bg-gray-50">人数分に揃える</button>'
-        + '</div>'
-        + '</div>'
+        + '<div class="flex items-center justify-between mb-1"><label class="block text-gray-600 text-sm">乗車地</label>'
+        + '<div class="flex gap-2"><button type="button" onclick="addReservationPickupRow()" class="px-2 py-1 rounded text-xs bg-white border hover:bg-gray-50">+ 追加</button>'
+        + '<button type="button" onclick="fillPickupRowsByCount()" class="px-2 py-1 rounded text-xs bg-white border hover:bg-gray-50">人数分に揃える</button></div></div>'
         + '<div id="edit-res-pickups-container"></div>'
-        + '<p class="text-xs text-gray-500 mt-1">複数人で乗車地が異なる場合は行を分けて設定。1人で複数候補を持たせる場合も行追加で登録できます。</p>'
         + '</div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onReservationEditInputsChanged(\'' + r.id + '\')"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">前列座席</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onReservationEditInputsChanged(\'' + r.id + '\')"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">合計金額</label><div class="flex gap-2"><input type="number" id="edit-res-amount" class="w-full border p-2 rounded text-sm" min="0" value="' + r.amount + '"><button type="button" onclick="recalculateReservationAmount(\'' + r.id + '\')" class="px-3 py-2 rounded text-xs bg-gray-100 hover:bg-gray-200 border">自動計算</button></div><p id="edit-res-amount-hint" class="text-xs text-gray-500 mt-1"></p></div>'
-        + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
-        + '<hr>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">備考</span><span class="font-bold text-sm text-right max-w-[60%]"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">特別会員</span><span class="font-bold text-sm">' + (r.specialMember ? '適用中' : '未適用') + '</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">会員割引</span><span class="font-bold text-sm">-¥' + (r.memberDiscountTotal || 0).toLocaleString() + '</span></div>'
-        + '<div class="flex justify-between items-center"><span class="text-gray-600 text-sm">合計金額</span><span class="font-bold text-lg text-red-600">¥' + r.amount.toLocaleString() + '</span></div>'
+        + '<div class="flex justify-between text-sm"><span class="text-gray-500">会員割引</span><span>-¥' + (r.memberDiscountTotal || 0).toLocaleString() + '</span></div>'
+        + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
         + '</div>'
-        + '<div class="mt-3 p-3 border rounded bg-white">'
-        + '<label class="flex items-center gap-2 text-sm font-bold">'
-        + '<input type="checkbox" id="detail-special-member" ' + (r.specialMember ? 'checked' : '') + ' ' + (!r.lineUserId || r.status === 'cancelled' ? 'disabled' : '') + '>'
-        + '<span>特別会員（1人あたり300円引き）</span>'
-        + '</label>'
-        + '<p class="text-xs text-gray-500 mt-1">チェックすると、この予約と同じLINE IDの今後予約にも割引を適用します</p>'
-        + (!r.lineUserId ? '<p class="text-xs text-red-500 mt-1">LINE IDが無い予約は特別会員登録できません</p>' : '')
-        + (r.status === 'cancelled' ? '<p class="text-xs text-red-500 mt-1">キャンセル済み予約には特別会員を適用できません</p>' : '')
-        + '<button onclick="updateSpecialMember(\'' + r.id + '\');" ' + (r.status === 'cancelled' ? 'disabled' : '') + ' class="mt-2 w-full bg-blue-50 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 text-blue-700 font-bold py-2 rounded text-sm">会員設定を保存</button>'
-        + '</div>'
-        + '<div class="mt-3 p-3 border rounded bg-white">'
-        + '<label class="block text-sm font-bold mb-2">ステータス変更</label>'
-        + '<select id="detail-status-select" class="w-full border p-2 rounded text-sm mb-2">'
+        + '<hr class="my-3">'
+        + '<div class="space-y-2">'
+        + '<label class="block text-sm font-bold">ステータス変更</label>'
+        + '<select id="detail-status-select" class="w-full border p-2 rounded text-sm">'
         + '<option value="pending"' + (r.status === 'pending' ? ' selected' : '') + '>【予約申込中】</option>'
         + '<option value="confirmed"' + (r.status === 'confirmed' ? ' selected' : '') + '>【ご予約確定】</option>'
         + '<option value="cancelled"' + (r.status === 'cancelled' ? ' selected' : '') + '>【キャンセル】</option>'
@@ -838,33 +845,189 @@ function showReservationDetail(id) {
         + '</select>'
         + '<button onclick="saveDetailStatus(\'' + r.id + '\');" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded text-sm">ステータスを保存</button>'
         + '</div>'
-        + '<div class="mt-3 p-3 border rounded bg-blue-50">'
-        + '<label class="block text-sm font-bold mb-2">顧客メモ（LINE IDに紐づく永続メモ）</label>'
-        + (r.lineUserId ? '<textarea id="customer-memo-text" class="w-full border p-2 rounded text-sm h-20 resize-none placeholder-gray-400" placeholder="顧客メモを入力（次回予約にも引き継がれます）"></textarea>'
-            + '<button onclick="saveCustomerMemo(\'' + r.lineUserId + '\');" class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded text-sm">顧客メモを保存</button>'
-            : '<p class="text-xs text-gray-500">LINE IDが無いため顧客メモは利用できません</p>')
-        + '</div>'
-        + '<div class="mt-3 p-3 border rounded bg-green-50">'
-        + '<label class="block text-sm font-bold mb-2">手動メモ（この予約のみ）</label>'
-        + '<textarea id="manual-memo-text" class="w-full border p-2 rounded text-sm h-20 resize-none placeholder-gray-400" placeholder="手動メモを入力（この予約のみ保存）">' + (r.manualMemo || '') + '</textarea>'
-        + '<button onclick="saveManualMemo(\'' + r.id + '\');" class="mt-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded text-sm">手動メモを保存</button>'
+        + '<div class="mt-3 p-3 border rounded bg-white">'
+        + '<label class="flex items-center gap-2 text-sm font-bold">'
+        + '<input type="checkbox" id="detail-special-member" ' + (r.specialMember ? 'checked' : '') + ' ' + (!r.lineUserId || r.status === 'cancelled' ? 'disabled' : '') + '>'
+        + '<span>特別会員（1人あたり300円引き）</span>'
+        + '</label>'
+        + (!r.lineUserId ? '<p class="text-xs text-red-500 mt-1">LINE IDが無い予約は特別会員登録できません</p>' : '')
+        + '<button onclick="updateSpecialMember(\'' + r.id + '\');" ' + (r.status === 'cancelled' ? 'disabled' : '') + ' class="mt-2 w-full bg-blue-50 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 text-blue-700 font-bold py-2 rounded text-sm">会員設定を保存</button>'
         + '</div>'
         + '<div class="mt-3 p-3 border rounded bg-red-50 border-red-200">'
-        + '<p class="text-xs text-red-700 mb-2">この操作は取り消せません。予約データを完全に削除します。</p>'
+        + '<p class="text-xs text-red-700 mb-2">この操作は取り消せません。</p>'
         + '<button onclick="deleteReservationPermanent(\'' + r.id + '\');" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded text-sm">予約を物理削除</button>'
+        + '</div>'
         + '</div>';
 
+    const tab2Html = '<div id="detail-tab-memo" style="display:none">'
+        + '<div class="space-y-4">'
+        + '<div class="p-3 border rounded bg-blue-50">'
+        + '<label class="block text-sm font-bold mb-2">顧客メモ（LINE IDに紐づく・次回予約に引き継がれる）</label>'
+        + (r.lineUserId
+            ? '<textarea id="customer-memo-text" class="w-full border p-2 rounded text-sm h-24 resize-none" placeholder="顧客メモ"></textarea>'
+              + '<button onclick="saveCustomerMemo(\'' + r.lineUserId + '\');" class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded text-sm">顧客メモを保存</button>'
+            : '<p class="text-xs text-gray-500">LINE IDが無いため利用できません</p>')
+        + '</div>'
+        + '<div class="p-3 border rounded bg-green-50">'
+        + '<label class="block text-sm font-bold mb-2">手動メモ（この予約のみ）</label>'
+        + '<textarea id="manual-memo-text" class="w-full border p-2 rounded text-sm h-24 resize-none" placeholder="手動メモ">' + (r.manualMemo || '') + '</textarea>'
+        + '<button onclick="saveManualMemo(\'' + r.id + '\');" class="mt-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded text-sm">手動メモを保存</button>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+
+    const isOther = r.progressStatus && !['shipping','middle','final','check'].includes(r.progressStatus);
+    const tab3Html = '<div id="detail-tab-progress" style="display:none">'
+        + '<div class="space-y-4">'
+        + '<div class="p-3 border rounded bg-gray-50">'
+        + '<label class="block text-sm font-bold mb-2">進捗ステータス</label>'
+        + '<select id="progress-status-select" class="w-full border p-2 rounded text-sm mb-2" onchange="onProgressStatusSelectChange()">'
+        + '<option value="shipping"' + (r.progressStatus === 'shipping' ? ' selected' : '') + '>発送</option>'
+        + '<option value="middle"' + (r.progressStatus === 'middle' ? ' selected' : '') + '>中間</option>'
+        + '<option value="final"' + (r.progressStatus === 'final' ? ' selected' : '') + '>最終</option>'
+        + '<option value="check"' + (r.progressStatus === 'check' ? ' selected' : '') + '>要確認</option>'
+        + '<option value="other"' + (isOther ? ' selected' : '') + '>その他（自由入力）</option>'
+        + '</select>'
+        + '<input type="text" id="progress-status-other-input" class="w-full border p-2 rounded text-sm mb-2" placeholder="状態を入力" value="' + (isOther ? r.progressStatus : '') + '" style="display:' + (isOther ? 'block' : 'none') + '">'
+        + '<button onclick="saveProgressStatus(\'' + r.id + '\');" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded text-sm">進捗ステータスを保存</button>'
+        + '</div>'
+        + '<div class="p-3 border rounded bg-white">'
+        + '<label class="block text-sm font-bold mb-3">状態管理ログ</label>'
+        + (pLogs.length === 0
+            ? '<div class="text-xs text-gray-400 p-2">まだ記録がありません。台帳の「記録」ボタンから入力できます。</div>'
+            : '<div class="space-y-2">' + pLogs.slice().reverse().map(function(entry) {
+                const m = getProgressMeta(entry.status);
+                const dt = entry.updatedAt ? entry.updatedAt.substring(0, 16).replace('T', ' ') : '';
+                return '<div class="flex flex-wrap gap-2 items-center text-sm border-b pb-2">'
+                    + '<span class="px-2 py-0.5 rounded text-xs font-bold ' + m.className + '">' + m.label + '</span>'
+                    + '<span class="text-gray-600 text-xs">' + (entry.method || '-') + '</span>'
+                    + '<span class="flex-1 text-gray-700 text-xs">' + (entry.memo || '') + '</span>'
+                    + '<span class="text-gray-400 text-xs">' + dt + '</span>'
+                    + '</div>';
+              }).join('') + '</div>')
+        + '<p class="text-xs text-gray-400 mt-2">記録の追加は台帳の「記録」ボタンから行えます。</p>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+
+    const body = document.getElementById('reservation-detail-body');
+    body.innerHTML = headerHtml + tabButtonsHtml + tab1Html + tab2Html + tab3Html;
     openModal('modal-reservation-detail');
     initReservationPickupEditor(r);
     syncReservationAmountByInputs(id, false);
-    
-    // 顧客メモを非同期で読み込む
-    if (r.lineUserId) {
-        loadCustomerMemo(r.lineUserId);
-    }
+    if (r.lineUserId) loadCustomerMemo(r.lineUserId);
 }
 
-// 顧客メモを読み込む
+function switchDetailTab(tab) {
+    ['booking','memo','progress'].forEach(function(t) {
+        const c = document.getElementById('detail-tab-' + t);
+        const b = document.getElementById('tab-btn-' + t);
+        if (!c || !b) return;
+        if (t === tab) { c.style.display = ''; b.className = 'px-4 py-2 text-sm font-bold border-b-2 border-blue-500 text-blue-600'; }
+        else { c.style.display = 'none'; b.className = 'px-4 py-2 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700'; }
+    });
+}
+
+function onProgressStatusSelectChange() {
+    const sel = document.getElementById('progress-status-select');
+    const other = document.getElementById('progress-status-other-input');
+    if (sel && other) other.style.display = sel.value === 'other' ? 'block' : 'none';
+}
+
+async function saveProgressStatus(id) {
+    const sel = document.getElementById('progress-status-select');
+    const other = document.getElementById('progress-status-other-input');
+    if (!sel) return;
+    const ps = sel.value === 'other' ? (other ? other.value.trim() : '') : sel.value;
+    if (!ps) { alert('ステータスを入力してください'); return; }
+    try {
+        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+            method: 'PATCH', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ progressStatus: ps })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const r = cachedReservations.find(function(x) { return x.id === id; });
+        if (r) r.progressStatus = ps;
+        alert('保存しました');
+        loadReservations();
+    } catch (e) { alert('保存失敗: ' + e.message); }
+}
+
+function _inlineProgressForm(r) {
+    const pLogs = Array.isArray(r.progressLog) ? r.progressLog : [];
+    const STATUS_OPT = [{v:'shipping',l:'発送'},{v:'middle',l:'中間'},{v:'final',l:'最終'},{v:'check',l:'要確認'}];
+    const METHOD_OPT = ['電話','個人LINE','公式LINE','メール','その他'];
+    const cur = r.progressStatus || 'shipping';
+    const sOpts = STATUS_OPT.map(function(o){ return '<option value="'+o.v+'"'+(o.v===cur?' selected':'')+'>'+o.l+'</option>'; }).join('');
+    const mOpts = METHOD_OPT.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('');
+    let form = '<div class="flex flex-wrap gap-2 items-center mb-2">'
+        + '<select id="inline-status-'+r.id+'" class="border p-1.5 rounded text-sm bg-white">'+sOpts+'</select>'
+        + '<select id="inline-method-'+r.id+'" class="border p-1.5 rounded text-sm bg-white">'+mOpts+'</select>'
+        + '<input type="text" id="inline-memo-'+r.id+'" class="border p-1.5 rounded text-sm flex-1 min-w-[120px]" placeholder="メモ（任意）">'
+        + '<button onclick="saveInlineProgress(\'' + r.id + '\')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded font-bold">保存</button>'
+        + '<button onclick="toggleProgressRow(\'' + r.id + '\')" class="px-2 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-600 text-sm rounded">✕</button>'
+        + '</div>';
+    let hist = pLogs.length > 0
+        ? '<div class="text-xs text-gray-500 mb-1 font-bold">履歴</div><div class="space-y-1">'
+          + pLogs.slice().reverse().map(function(e){
+              const m=getProgressMeta(e.status);
+              const dt=e.updatedAt?e.updatedAt.substring(0,16).replace('T',' '):'';
+              return '<div class="flex gap-2 items-center text-xs">'
+                  +'<span class="px-1.5 py-0.5 rounded font-bold '+m.className+'">'+m.label+'</span>'
+                  +'<span class="text-gray-600">'+(e.method||'')+'</span>'
+                  +'<span class="text-gray-500">'+(e.memo||'')+'</span>'
+                  +'<span class="text-gray-400 ml-auto">'+dt+'</span>'
+                  +'</div>';
+          }).join('')+'</div>'
+        : '<div class="text-xs text-gray-400">まだ記録がありません</div>';
+    return form + '<hr class="my-2">' + hist;
+}
+
+function toggleProgressRow(id) {
+    const row = document.getElementById('progress-row-' + id);
+    if (!row) return;
+    if (row.style.display === 'none') {
+        row.style.display = '';
+        const r = cachedReservations.find(function(x){return x.id===id;}) || cachedWaitlist.find(function(x){return x.id===id;});
+        if (r) row.querySelector('td').innerHTML = _inlineProgressForm(r);
+    } else { row.style.display = 'none'; }
+}
+
+async function saveInlineProgress(id) {
+    const sSel = document.getElementById('inline-status-'+id);
+    const mSel = document.getElementById('inline-method-'+id);
+    const memo = document.getElementById('inline-memo-'+id);
+    if (!sSel) return;
+    const entry = { status: sSel.value, method: mSel?mSel.value:'', memo: memo?memo.value.trim():'', updatedAt: new Date().toISOString().substring(0,16) };
+    const r = cachedReservations.find(function(x){return x.id===id;}) || cachedWaitlist.find(function(x){return x.id===id;});
+    if (!r) return;
+    let logs = Array.isArray(r.progressLog) ? r.progressLog.slice() : [];
+    const idx = logs.findIndex(function(e){return e.status===entry.status;});
+    if (idx>=0) { logs[idx]=entry; } else { logs.push(entry); }
+    try {
+        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+            method:'PATCH', headers:{...getAuthHeaders(),'Content-Type':'application/json'},
+            body: JSON.stringify({progressStatus:entry.status, progressLog:logs})
+        });
+        if (!res.ok) throw new Error(await res.text());
+        r.progressLog = logs;
+        r.progressStatus = entry.status;
+        if (memo) memo.value = '';
+        const row = document.getElementById('progress-row-'+id);
+        if (row) row.querySelector('td').innerHTML = _inlineProgressForm(r);
+        const mainTr = document.querySelector('tr[data-res-id="'+id+'"]');
+        if (mainTr) {
+            const cells = mainTr.querySelectorAll('td');
+            const m = getProgressMeta(entry.status);
+            const html = '<span class="px-1 py-0.5 rounded text-xs font-bold '+m.className+'">'+m.label+'</span>'
+                + ' <span class="text-xs text-gray-500">'+(entry.method||'')+'</span>'
+                + (entry.memo?'<span class="text-xs text-gray-400">'+entry.memo.substring(0,12)+'</span>':'');
+            if (cells[7]) cells[7].innerHTML = html;
+        }
+    } catch(e) { alert('保存失敗: '+e.message); }
+}
+
+
 async function loadCustomerMemo(lineUserId) {
     try {
         const res = await fetch(`${API_BASE_URL}/customer-memos/${lineUserId}`, {
