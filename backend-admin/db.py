@@ -97,9 +97,10 @@ def update_reservation_status(
     pickup=None,
     pickups=None,
     seat_pref=None,
-    total_price=None
+    total_price=None,
+    progress_log=None
 ):
-    """予約更新（status / progressStatus / remark / 顧客情報 / 人数 / 乗車地(単数/複数) / 座席 / 金額）"""
+    """予約更新（status / progressStatus / remark / 顧客情報 / 人数 / 乗車地(単数/複数) / 座席 / 金額 / progressLog）"""
     res_doc = db.collection('reservations').document(reservation_id).get()
     if not res_doc.exists:
         return False
@@ -143,6 +144,8 @@ def update_reservation_status(
             update_payload['remark'] = remark
         if manual_memo is not None:
             update_payload['manualMemo'] = manual_memo
+        if progress_log is not None:
+            update_payload['progressLog'] = progress_log
 
         # 予約編集（管理画面）
         if name is not None:
