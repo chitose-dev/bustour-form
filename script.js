@@ -529,6 +529,29 @@ function loadReservations() {
         tr.onclick = function() { showReservationDetail(r.id); };
         tbody.appendChild(tr);
     });
+
+    // ツアー絞り込み時に旅行日・ツアー名列を非表示
+    const table = tbody.closest('table');
+    const headers = table.querySelectorAll('thead th');
+    const rows = table.querySelectorAll('tbody tr');
+    
+    if (filterTourId) {
+        // ツアー選択時は最初の 2 列（ツアー日、ツアー名）を非表示
+        headers[0].style.display = 'none';
+        headers[1].style.display = 'none';
+        rows.forEach(function(row) {
+            row.cells[0].style.display = 'none';
+            row.cells[1].style.display = 'none';
+        });
+    } else {
+        // ツアー未選択時は表示
+        headers[0].style.display = '';
+        headers[1].style.display = '';
+        rows.forEach(function(row) {
+            row.cells[0].style.display = '';
+            row.cells[1].style.display = '';
+        });
+    }
 }
 
 // 予約詳細モーダル

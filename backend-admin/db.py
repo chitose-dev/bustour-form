@@ -105,7 +105,6 @@ def update_reservation_status(
     
     res_data = res_doc.to_dict()
     tour_id = res_data.get('tour_id')
-    passengers = res_data.get('passengers', 0)
     
     # トランザクション開始
     @firestore.transactional
