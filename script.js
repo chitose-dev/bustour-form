@@ -750,6 +750,8 @@ async function saveCustomerMemo(reservationId, lineUserId) {
             if (!lineUserId) {
                 const r = cachedReservations.find(function(x) { return x.id === reservationId; });
                 if (r) r.manualMemo = memo;
+                // 詳細を再表示して反映
+                showReservationDetail(reservationId);
             }
         } else {
             const err = await res.json().catch(() => ({}));
