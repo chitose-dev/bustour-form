@@ -84,8 +84,21 @@ def delete_reservation(reservation_id):
     delete_with_inventory(transaction)
     return True
 
-def update_reservation_status(reservation_id, new_status=None, progress_status=None, remark=None, manual_memo=None):
-    """予約更新（status / progressStatus / remark）- キャンセル時は在庫を確実に復元"""
+def update_reservation_status(
+    reservation_id,
+    new_status=None,
+    progress_status=None,
+    remark=None,
+    manual_memo=None,
+    name=None,
+    phone=None,
+    address=None,
+    passengers=None,
+    pickup=None,
+    seat_pref=None,
+    total_price=None
+):
+    """予約更新（status / progressStatus / remark / 顧客情報 / 人数 / 乗車地 / 座席 / 金額）"""
     res_doc = db.collection('reservations').document(reservation_id).get()
     if not res_doc.exists:
         return False
@@ -130,6 +143,47 @@ def update_reservation_status(reservation_id, new_status=None, progress_status=N
             update_payload['remark'] = remark
         if manual_memo is not None:
             update_payload['manualMemo'] = manual_memo
+
+        # 予約編集（管理画面）
+        if name is not None:
+            update_payload['name'] = str(name)
+        if phone is not None:
+            update_payload['phone'] = str(phone)
+        if address is not None:
+            update_payload['address'] = str(address)
+
+        normalized_passengers = None
+        if passengers is not None:
+            normalized_passengers = max(int(passengers), 1)
+            update_payload['passengers'] = normalized_passengers
+
+        if pickup is not None:
+            update_payload['pickup'] = str(pickup)
+            update_payload['pickups'] = [str(pickup)] if str(pickup) else []
+
+        if seat_pref is not None:
+            update_payload['seat_pref'] = str(seat_pref)
+            seat_flag = str(seat_pref) == 'あり'
+            seat_count = normalized_passengers if normalized_passengers is not None else max(int(res_snapshot.to_dict().get('passengers', 0) or 0), 1)
+            update_payload['preferredSeats'] = [seat_flag] * seat_count
+
+        if total_price is not None:
+            normalized_total = max(int(total_price), 0)
+            update_payload['totalPrice'] = normalized_total
+            update_payload['amount'] = normalized_total
+
+        # userInfo も整合させる
+        if name is not None or phone is not None or address is not None:
+            current_data = res_snapshot.to_dict() or {}
+            current_user_info = current_data.get('userInfo') or {}
+            merged_user_info = {
+                'name': str(name) if name is not None else current_user_info.get('name', ''),
+                'phone': str(phone) if phone is not None else current_user_info.get('phone', ''),
+                'pref': current_user_info.get('pref', ''),
+                'city': current_user_info.get('city', ''),
+                'street': str(address) if address is not None else current_user_info.get('street', '')
+            }
+            update_payload['userInfo'] = merged_user_info
 
         transaction.update(res_ref, update_payload)
         
