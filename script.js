@@ -992,13 +992,18 @@ async function saveProgressLog(id) {
         if (!log[key]) log[key] = {};
         log[key][field] = input.value;
     });
-    // 日時は保存時点で記録
+    // 日時は保存時点で記録（メモまたは担当者が入力されている行のみ更新）
     const now = new Date().toISOString().substring(0, 16);
+    const r = cachedReservations.find(function(x) { return x.id === id; });
+    const existingLog = (r && r.progressLog) || {};
     ['middle', 'shipping', 'final'].forEach(function(key) {
         if (!log[key]) log[key] = {};
-        // メモか担当者が入力されていれば日時を更新
         if (log[key].memo || log[key].staff) {
+            // 入力あり: 日時を現在時刻に更新
             log[key].updatedAt = now;
+        } else {
+            // 入力なし: 既存の日時を保持
+            log[key].updatedAt = (existingLog[key] && existingLog[key].updatedAt) || '';
         }
     });
     try {
