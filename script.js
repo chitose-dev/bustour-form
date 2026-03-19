@@ -8,6 +8,9 @@
 // ==========================================
 const USE_MOCK = false;
 const API_BASE_URL = "https://backend-admin-482800127304.asia-northeast1.run.app/api/admin";
+const PREFERRED_SEAT_PRICE = 500;
+const SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300;
+const MANUAL_PRICE_PLUS_PER_PERSON = 100;
 
 // 状態管理
 let currentAuthToken = null;
@@ -99,6 +102,118 @@ function formatPickupsDisplay(r) {
     return resolved.join(', ');
 }
 
+function getActivePickupNames() {
+    return cachedPickups
+        .filter(function(p) { return p.active; })
+        .sort(function(a, b) { return a.sortOrder - b.sortOrder; })
+        .map(function(p) { return p.name; });
+}
+
+function getPickupSelectHtml(selectedValue) {
+    var selected = selectedValue || '';
+    var optionsHtml = '<option value="">未選択</option>';
+    var names = getActivePickupNames();
+    names.forEach(function(name) {
+        optionsHtml += '<option value="' + name + '"' + (selected === name ? ' selected' : '') + '>' + name + '</option>';
+    });
+    if (selected && names.indexOf(selected) === -1) {
+        optionsHtml += '<option value="' + selected + '" selected>' + selected + '（非アクティブ）</option>';
+    }
+    return optionsHtml;
+}
+
+function buildPickupRowHtml(selectedValue, index) {
+    return '<div class="flex gap-2 items-center mb-2" data-pickup-row="1">'
+        + '<span class="text-xs text-gray-500 w-12">' + (index + 1) + '人目</span>'
+        + '<select class="edit-res-pickup-item flex-1 border p-2 rounded text-sm bg-white">' + getPickupSelectHtml(selectedValue) + '</select>'
+        + '<button type="button" onclick="removeReservationPickupRow(this)" class="px-3 py-2 rounded text-xs border bg-white hover:bg-gray-50">削除</button>'
+        + '</div>';
+}
+
+function initReservationPickupEditor(reservation) {
+    var container = document.getElementById('edit-res-pickups-container');
+    if (!container) return;
+
+    var rawPickups = Array.isArray(reservation.pickups) ? reservation.pickups.filter(Boolean) : [];
+    var resolvedPickups = rawPickups.map(resolvePickupName).filter(Boolean);
+    if (resolvedPickups.length === 0 && reservation.pickup) {
+        resolvedPickups = [resolvePickupName(reservation.pickup) || reservation.pickup];
+    }
+    if (resolvedPickups.length === 0) {
+        resolvedPickups = [''];
+    }
+
+    container.innerHTML = resolvedPickups.map(function(p, idx) {
+        return buildPickupRowHtml(p, idx);
+    }).join('');
+    refreshReservationPickupRowLabels();
+}
+
+function refreshReservationPickupRowLabels() {
+    var rows = Array.from(document.querySelectorAll('#edit-res-pickups-container [data-pickup-row="1"]'));
+    rows.forEach(function(row, idx) {
+        var label = row.querySelector('span');
+        if (label) {
+            label.innerText = (idx + 1) + '人目';
+        }
+    });
+}
+
+function addReservationPickupRow() {
+    var container = document.getElementById('edit-res-pickups-container');
+    if (!container) return;
+    var rowCount = container.querySelectorAll('[data-pickup-row="1"]').length;
+    container.insertAdjacentHTML('beforeend', buildPickupRowHtml('', rowCount));
+    refreshReservationPickupRowLabels();
+}
+
+function removeReservationPickupRow(button) {
+    var container = document.getElementById('edit-res-pickups-container');
+    if (!container || !button) return;
+    var rows = container.querySelectorAll('[data-pickup-row="1"]');
+    if (rows.length <= 1) {
+        alert('乗車地は最低1件残してください');
+        return;
+    }
+    var row = button.closest('[data-pickup-row="1"]');
+    if (row) row.remove();
+    refreshReservationPickupRowLabels();
+}
+
+function fillPickupRowsByCount() {
+    var countInput = document.getElementById('edit-res-count');
+    var container = document.getElementById('edit-res-pickups-container');
+    if (!countInput || !container) return;
+    var count = parseInt(countInput.value, 10);
+    if (!count || count < 1) count = 1;
+
+    var currentValues = Array.from(container.querySelectorAll('.edit-res-pickup-item')).map(function(el) {
+        return el.value || '';
+    });
+    var first = currentValues[0] || '';
+    var nextValues = [];
+    for (var i = 0; i < count; i++) {
+        nextValues.push(currentValues[i] !== undefined ? currentValues[i] : first);
+    }
+    container.innerHTML = nextValues.map(function(v, idx) {
+        return buildPickupRowHtml(v, idx);
+    }).join('');
+    refreshReservationPickupRowLabels();
+}
+
+function getEditedPickupValues() {
+    var values = Array.from(document.querySelectorAll('.edit-res-pickup-item')).map(function(el) {
+        return (el.value || '').trim();
+    }).filter(Boolean);
+    return values;
+}
+
+function sortToursByDateAsc(a, b) {
+    var dateCompare = (a.date || '').localeCompare(b.date || '');
+    if (dateCompare !== 0) return dateCompare;
+    return (a.title || '').localeCompare(b.title || '');
+}
+
 // ==========================================
 // 1. 初期化・認証
 // ==========================================
@@ -109,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
 async function handleLogin(e) {
     e.preventDefault();
     const password = document.getElementById('login-password').value;
-    const loginBtn = document.querySelector('#login-form button[type="submit"], #login-form button:not([type])');
 
     if (USE_MOCK) {
         if (password === 'admin') {
@@ -118,18 +232,12 @@ async function handleLogin(e) {
             alert('パスワードが違います');
         }
     } else {
-        // ローディング表示
-        if (loginBtn) { loginBtn.textContent = 'ログイン中...'; loginBtn.disabled = true; }
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒タイムアウト
             const res = await fetch(`${API_BASE_URL}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password }),
-                signal: controller.signal
+                body: JSON.stringify({ password })
             });
-            clearTimeout(timeoutId);
             if (res.ok) {
                 const data = await res.json();
                 loginSuccess(data.token);
@@ -139,13 +247,7 @@ async function handleLogin(e) {
             }
         } catch (err) {
             console.error(err);
-            if (err.name === 'AbortError') {
-                alert('接続タイムアウト。しばらくしてから再度お試しください。');
-            } else {
-                alert('通信エラー。インターネット接続を確認してください。');
-            }
-        } finally {
-            if (loginBtn) { loginBtn.textContent = 'ログイン'; loginBtn.disabled = false; }
+            alert('通信エラー');
         }
     }
 }
@@ -278,7 +380,7 @@ function populateFilterTourDropdown() {
     const select = document.getElementById('filter-tour-name');
     const currentVal = select.value;
     select.innerHTML = '<option value="">すべてのツアー</option>';
-    cachedTours.forEach(function(t) {
+    cachedTours.slice().sort(sortToursByDateAsc).forEach(function(t) {
         const opt = document.createElement('option');
         opt.value = t.id;
         opt.textContent = t.date + ' ： ' + t.title;
@@ -357,9 +459,10 @@ function openModal(modalId) {
     document.getElementById(modalId).classList.remove('hidden');
     
     if (modalId === 'modal-add-reservation') {
+        resetManualReservationForm();
         const select = document.getElementById('manual-tour-id');
         select.innerHTML = '';
-        cachedTours.forEach(function(t) {
+        cachedTours.slice().sort(sortToursByDateAsc).forEach(function(t) {
             const opt = document.createElement('option');
             opt.value = t.id;
             opt.innerText = t.date + ' : ' + t.title + ' (残' + (t.capacity - (t.current || 0)) + ')';
@@ -389,6 +492,130 @@ function closeModal(modalId) {
         document.getElementById('form-tour-editor').reset();
         document.getElementById('edit-tour-id').value = '';
     }
+    if (modalId === 'modal-add-reservation') {
+        resetManualReservationForm();
+    }
+}
+
+function resetManualReservationForm() {
+    var form = document.getElementById('form-manual-reservation');
+    if (form) form.reset();
+    var step1 = document.getElementById('manual-step-1');
+    var step2 = document.getElementById('manual-step-2');
+    if (step1) step1.classList.remove('hidden');
+    if (step2) step2.classList.add('hidden');
+    var countInput = document.getElementById('manual-count');
+    if (countInput && !countInput.value) countInput.value = '1';
+    var totalInput = document.getElementById('manual-confirm-price');
+    if (totalInput) totalInput.value = '';
+    var summary = document.getElementById('manual-preview-summary');
+    if (summary) summary.innerHTML = '';
+    var discountRow = document.getElementById('manual-breakdown-discount-row');
+    if (discountRow) discountRow.classList.add('hidden');
+}
+
+function getManualReservationDraft() {
+    var tourId = document.getElementById('manual-tour-id').value;
+    var name = document.getElementById('manual-name').value.trim();
+    var phone = document.getElementById('manual-phone').value.trim();
+    var address = document.getElementById('manual-address').value.trim();
+    var count = parseInt(document.getElementById('manual-count').value, 10);
+    var pickups = Array.from(document.querySelectorAll('.manual-pickup-cb:checked')).map(function(cb) { return cb.value; });
+    var seatPref = document.getElementById('manual-seat-pref').value;
+    var specialMember = !!document.getElementById('manual-special-member').checked;
+    var tour = cachedTours.find(function(item) { return item.id === tourId; });
+
+    return {
+        tourId: tourId,
+        tour: tour,
+        name: name,
+        phone: phone,
+        address: address,
+        count: count,
+        pickups: pickups,
+        seatPref: seatPref,
+        specialMember: specialMember
+    };
+}
+
+function calculateManualReservationPrice(draft) {
+    if (!draft.tour) return null;
+    var baseUnitPrice = Number(draft.tour.price || 0) + MANUAL_PRICE_PLUS_PER_PERSON;
+    var baseTotal = baseUnitPrice * draft.count;
+    var seatCharge = draft.seatPref === 'あり' ? draft.count * PREFERRED_SEAT_PRICE : 0;
+    var discount = draft.specialMember ? draft.count * SPECIAL_MEMBER_DISCOUNT_PER_PERSON : 0;
+    var total = Math.max(baseTotal + seatCharge - discount, 0);
+
+    return {
+        baseUnitPrice: baseUnitPrice,
+        baseTotal: baseTotal,
+        seatCharge: seatCharge,
+        discount: discount,
+        total: total
+    };
+}
+
+function showManualReservationPreview() {
+    var draft = getManualReservationDraft();
+    if (!draft.tour) {
+        alert('ツアーを選択してください');
+        return;
+    }
+    if (!draft.name) {
+        alert('氏名を入力してください');
+        return;
+    }
+    if (!draft.phone) {
+        alert('電話番号を入力してください');
+        return;
+    }
+    if (!draft.count || draft.count < 1) {
+        alert('人数は1以上にしてください');
+        return;
+    }
+    if (draft.pickups.length === 0) {
+        alert('乗車地を1つ以上選択してください');
+        return;
+    }
+
+    var pricing = calculateManualReservationPrice(draft);
+    if (!pricing) {
+        alert('金額計算に失敗しました');
+        return;
+    }
+
+    document.getElementById('manual-preview-summary').innerHTML = ''
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">ツアー</span><span class="font-bold text-right">' + draft.tour.date + ' : ' + draft.tour.title + '</span></div>'
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">氏名</span><span class="font-bold text-right">' + draft.name + '</span></div>'
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">電話番号</span><span class="font-bold text-right">' + draft.phone + '</span></div>'
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">住所</span><span class="font-bold text-right break-all">' + (draft.address || '-') + '</span></div>'
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">人数</span><span class="font-bold text-right">' + draft.count + '名</span></div>'
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">乗車地</span><span class="font-bold text-right">' + draft.pickups.join(' / ') + '</span></div>'
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">前列座席指定</span><span class="font-bold text-right">' + draft.seatPref + '</span></div>'
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">特別会員</span><span class="font-bold text-right">' + (draft.specialMember ? '適用' : 'なし') + '</span></div>';
+
+    document.getElementById('manual-breakdown-base-unit').innerText = '¥' + pricing.baseUnitPrice.toLocaleString();
+    document.getElementById('manual-breakdown-base-total').innerText = '¥' + pricing.baseTotal.toLocaleString();
+    document.getElementById('manual-breakdown-seat').innerText = '¥' + pricing.seatCharge.toLocaleString();
+    document.getElementById('manual-confirm-price').value = pricing.total;
+
+    var discountRow = document.getElementById('manual-breakdown-discount-row');
+    var discountValue = document.getElementById('manual-breakdown-discount');
+    if (pricing.discount > 0) {
+        discountRow.classList.remove('hidden');
+        discountValue.innerText = '-¥' + pricing.discount.toLocaleString();
+    } else {
+        discountRow.classList.add('hidden');
+        discountValue.innerText = '-¥0';
+    }
+
+    document.getElementById('manual-step-1').classList.add('hidden');
+    document.getElementById('manual-step-2').classList.remove('hidden');
+}
+
+function backToManualReservationForm() {
+    document.getElementById('manual-step-2').classList.add('hidden');
+    document.getElementById('manual-step-1').classList.remove('hidden');
 }
 
 // CSVダウンロード
@@ -473,16 +700,6 @@ function loadReservations() {
     } else if (sortKey === 'status') {
         var statusOrder = { pending: 0, confirmed: 1, waitlist: 2, cancelled: 3 };
         filtered.sort(function(a, b) { return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0); });
-    } else if (sortKey === 'pickup') {
-        // 乗車地順: cachedPickupsのsortOrder順、乗車地なしは末尾
-        function getPickupSortOrder(r) {
-            var pickups = Array.isArray(r.pickups) ? r.pickups : [];
-            if (pickups.length === 0) return 9999;
-            var firstPickup = pickups[0];
-            var found = cachedPickups.find(function(p) { return p.id === firstPickup || p.name === firstPickup; });
-            return found ? (found.sortOrder || 0) : 9998;
-        }
-        filtered.sort(function(a, b) { return getPickupSortOrder(a) - getPickupSortOrder(b); });
     } else {
         filtered.sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
     }
@@ -514,8 +731,10 @@ function loadReservations() {
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]">' + tourName + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></td>'
@@ -565,12 +784,6 @@ function showReservationDetail(id) {
     const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
     const tourName = tourObj ? tourObj.title : r.tour_name;
     
-    // 乗車地オプションを生成
-    var pickupOptionsHtml = '<option value="">未選択</option>';
-    cachedPickups.filter(function(p) { return p.active; }).sort(function(a, b) { return a.sortOrder - b.sortOrder; }).forEach(function(p) {
-        pickupOptionsHtml += '<option value="' + p.name + '"' + (r.pickup === p.name ? ' selected' : '') + '>' + p.name + '</option>';
-    });
-
     const body = document.getElementById('reservation-detail-body');
     body.innerHTML = ''
         + '<div class="bg-gray-50 rounded-lg p-4 space-y-3 border">'
@@ -584,9 +797,20 @@ function showReservationDetail(id) {
         + '<div><label class="block text-gray-600 text-sm mb-1">氏名</label><input type="text" id="edit-res-name" class="w-full border p-2 rounded text-sm" value="' + (r.name || '').replace(/"/g, '&quot;') + '"></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">電話番号</label><input type="tel" id="edit-res-phone" class="w-full border p-2 rounded text-sm" value="' + (r.phone || '').replace(/"/g, '&quot;') + '"></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">住所</label><input type="text" id="edit-res-address" class="w-full border p-2 rounded text-sm" value="' + (r.address || '').replace(/"/g, '&quot;') + '"></div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">人数</label><input type="number" id="edit-res-count" class="w-full border p-2 rounded text-sm" min="1" value="' + r.count + '"></div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">乗車地</label><select id="edit-res-pickup" class="w-full border p-2 rounded text-sm bg-white">' + pickupOptionsHtml + '</select></div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">人数</label><input type="number" id="edit-res-count" class="w-full border p-2 rounded text-sm" min="1" value="' + r.count + '" oninput="onReservationEditInputsChanged(\'' + r.id + '\')"></div>'
+        + '<div>'
+        + '<div class="flex items-center justify-between mb-1">'
+        + '<label class="block text-gray-600 text-sm">乗車地（複数設定可）</label>'
+        + '<div class="flex gap-2">'
+        + '<button type="button" onclick="addReservationPickupRow()" class="px-2 py-1 rounded text-xs bg-white border hover:bg-gray-50">+ 行追加</button>'
+        + '<button type="button" onclick="fillPickupRowsByCount()" class="px-2 py-1 rounded text-xs bg-white border hover:bg-gray-50">人数分に揃える</button>'
+        + '</div>'
+        + '</div>'
+        + '<div id="edit-res-pickups-container"></div>'
+        + '<p class="text-xs text-gray-500 mt-1">複数人で乗車地が異なる場合は行を分けて設定。1人で複数候補を持たせる場合も行追加で登録できます。</p>'
+        + '</div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onReservationEditInputsChanged(\'' + r.id + '\')"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">合計金額</label><div class="flex gap-2"><input type="number" id="edit-res-amount" class="w-full border p-2 rounded text-sm" min="0" value="' + r.amount + '"><button type="button" onclick="recalculateReservationAmount(\'' + r.id + '\')" class="px-3 py-2 rounded text-xs bg-gray-100 hover:bg-gray-200 border">自動計算</button></div><p id="edit-res-amount-hint" class="text-xs text-gray-500 mt-1"></p></div>'
         + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
         + '<hr>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">備考</span><span class="font-bold text-sm text-right max-w-[60%]"><span class="px-2 py-1 rounded text-xs font-bold ' + progressMeta.className + '">' + progressMeta.label + '</span></span></div>'
@@ -614,19 +838,110 @@ function showReservationDetail(id) {
         + '</select>'
         + '<button onclick="saveDetailStatus(\'' + r.id + '\');" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded text-sm">ステータスを保存</button>'
         + '</div>'
-        + '<div class="mt-3 p-3 border rounded bg-white" id="memo-section">'
-        + '<label class="block text-sm font-bold mb-2">顧客メモ</label>'
-        + '<textarea id="customer-memo-input" class="w-full border p-2 rounded text-sm" rows="3" placeholder="このお客様へのメモを入力..."></textarea>'
-        + (r.lineUserId
-            ? '<p class="text-xs text-gray-500 mt-1">LINE予約: 同じLINE IDでの次回予約でも引き継がれます</p>'
-            : '<p class="text-xs text-gray-500 mt-1">手動予約: この予約のみに保存されます</p>')
-        + '<button onclick="saveCustomerMemo(\'' + r.id + '\', \'' + (r.lineUserId || '') + '\');" class="mt-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm">メモを保存</button>'
+        + '<div class="mt-3 p-3 border rounded bg-blue-50">'
+        + '<label class="block text-sm font-bold mb-2">顧客メモ（LINE IDに紐づく永続メモ）</label>'
+        + (r.lineUserId ? '<textarea id="customer-memo-text" class="w-full border p-2 rounded text-sm h-20 resize-none placeholder-gray-400" placeholder="顧客メモを入力（次回予約にも引き継がれます）"></textarea>'
+            + '<button onclick="saveCustomerMemo(\'' + r.lineUserId + '\');" class="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded text-sm">顧客メモを保存</button>'
+            : '<p class="text-xs text-gray-500">LINE IDが無いため顧客メモは利用できません</p>')
+        + '</div>'
+        + '<div class="mt-3 p-3 border rounded bg-green-50">'
+        + '<label class="block text-sm font-bold mb-2">手動メモ（この予約のみ）</label>'
+        + '<textarea id="manual-memo-text" class="w-full border p-2 rounded text-sm h-20 resize-none placeholder-gray-400" placeholder="手動メモを入力（この予約のみ保存）">' + (r.manualMemo || '') + '</textarea>'
+        + '<button onclick="saveManualMemo(\'' + r.id + '\');" class="mt-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded text-sm">手動メモを保存</button>'
+        + '</div>'
+        + '<div class="mt-3 p-3 border rounded bg-red-50 border-red-200">'
+        + '<p class="text-xs text-red-700 mb-2">この操作は取り消せません。予約データを完全に削除します。</p>'
+        + '<button onclick="deleteReservationPermanent(\'' + r.id + '\');" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded text-sm">予約を物理削除</button>'
         + '</div>';
 
     openModal('modal-reservation-detail');
+    initReservationPickupEditor(r);
+    syncReservationAmountByInputs(id, false);
+    
+    // 顧客メモを非同期で読み込む
+    if (r.lineUserId) {
+        loadCustomerMemo(r.lineUserId);
+    }
+}
 
-    // 顧客メモをロード
-    loadCustomerMemo(r.id, r.lineUserId);
+// 顧客メモを読み込む
+async function loadCustomerMemo(lineUserId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/customer-memos/${lineUserId}`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        
+        if (res.ok) {
+            const data = await res.json();
+            const memoTextarea = document.getElementById('customer-memo-text');
+            if (memoTextarea && data.memo) {
+                memoTextarea.value = data.memo;
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load customer memo:', err);
+    }
+}
+
+// 顧客メモを保存
+async function saveCustomerMemo(lineUserId) {
+    if (!lineUserId) {
+        alert('LINE IDが無いため保存できません');
+        return;
+    }
+    
+    try {
+        const memo = document.getElementById('customer-memo-text').value;
+        const res = await fetch(`${API_BASE_URL}/customer-memos/${lineUserId}`, {
+            method: 'POST',
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ memo: memo })
+        });
+        
+        if (res.ok) {
+            alert('顧客メモを保存しました');
+        } else {
+            alert('顧客メモの保存に失敗しました');
+        }
+    } catch (err) {
+        console.error('Failed to save customer memo:', err);
+        alert('通信エラーが発生しました');
+    }
+}
+
+// 手動メモを保存
+async function saveManualMemo(reservationId) {
+    try {
+        const memo = document.getElementById('manual-memo-text').value;
+        const res = await fetch(`${API_BASE_URL}/reservations/${reservationId}`, {
+            method: 'PATCH',
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ manualMemo: memo })
+        });
+        
+        if (res.ok) {
+            alert('手動メモを保存しました');
+            // キャッシュを更新
+            const updated = cachedReservations.find(function(r) { return r.id === reservationId; });
+            if (updated) {
+                updated.manualMemo = memo;
+            }
+            // 詳細を再表示
+            showReservationDetail(reservationId);
+        } else {
+            alert('手動メモの保存に失敗しました');
+        }
+    } catch (err) {
+        console.error('Failed to save manual memo:', err);
+        alert('通信エラーが発生しました');
+    }
 }
 
 async function updateReservationProgress(id, progressStatus) {
@@ -696,72 +1011,6 @@ async function updateReservationStatus(id, newStatus) {
     }
 }
 
-// 顧客メモ読み込み
-async function loadCustomerMemo(reservationId, lineUserId) {
-    const input = document.getElementById('customer-memo-input');
-    if (!input) return;
-    if (USE_MOCK) return;
-    try {
-        if (lineUserId) {
-            // LINE予約: customer_memosコレクションから取得
-            const res = await fetch(`${API_BASE_URL}/customer-memos/${lineUserId}`, {
-                headers: getAuthHeaders()
-            });
-            if (res.ok) {
-                const data = await res.json();
-                input.value = data.memo || '';
-            }
-        } else {
-            // 手動予約: 予約の manualMemo フィールドから取得
-            const r = cachedReservations.find(function(x) { return x.id === reservationId; });
-            input.value = (r && r.manualMemo) || '';
-        }
-    } catch (e) {
-        console.error('メモ読み込みエラー:', e);
-    }
-}
-
-// 顧客メモ保存
-async function saveCustomerMemo(reservationId, lineUserId) {
-    const input = document.getElementById('customer-memo-input');
-    if (!input) return;
-    const memo = input.value;
-    if (USE_MOCK) { alert('メモを保存しました（モック）'); return; }
-    try {
-        let res;
-        if (lineUserId) {
-            // LINE予約: customer_memosコレクションに保存（永続）
-            res = await fetch(`${API_BASE_URL}/customer-memos/${lineUserId}`, {
-                method: 'POST',
-                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ memo })
-            });
-        } else {
-            // 手動予約: この予約のmanualMemoフィールドに保存
-            res = await fetch(`${API_BASE_URL}/reservations/${reservationId}`, {
-                method: 'PATCH',
-                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ manualMemo: memo })
-            });
-        }
-        if (res && res.ok) {
-            alert('メモを保存しました');
-            // cachedReservationsのmanualMemoも更新
-            if (!lineUserId) {
-                const r = cachedReservations.find(function(x) { return x.id === reservationId; });
-                if (r) r.manualMemo = memo;
-                // 詳細を再表示して反映
-                showReservationDetail(reservationId);
-            }
-        } else {
-            const err = await res.json().catch(() => ({}));
-            alert('保存失敗: ' + (err.error || 'エラー'));
-        }
-    } catch (e) {
-        alert('保存中にエラーが発生しました: ' + e.message);
-    }
-}
-
 async function saveDetailStatus(id) {
     const select = document.getElementById('detail-status-select');
     if (!select) return;
@@ -770,16 +1019,109 @@ async function saveDetailStatus(id) {
     await updateReservationStatus(id, newStatus);
 }
 
-async function saveReservationEdit(id) {
-    var name = document.getElementById('edit-res-name').value.trim();
-    var phone = document.getElementById('edit-res-phone').value.trim();
-    var address = document.getElementById('edit-res-address').value.trim();
-    var count = parseInt(document.getElementById('edit-res-count').value);
-    var pickup = document.getElementById('edit-res-pickup').value;
-    var seatPref = document.getElementById('edit-res-seat').value;
+function getReservationById(id) {
+    return cachedReservations.find(function(x) { return x.id === id; }) || cachedWaitlist.find(function(x) { return x.id === id; }) || null;
+}
 
-    if (!name) { alert('氏名を入力してください'); return; }
-    if (count < 1) { alert('人数は1以上にしてください'); return; }
+function calculateReservationAmountForEdit(reservationId, count, seatPref) {
+    var reservation = getReservationById(reservationId);
+    if (!reservation) return null;
+
+    var tour = cachedTours.find(function(t) { return t.id === reservation.tour_id; });
+    var basePerPerson = tour && !isNaN(Number(tour.price)) ? Number(tour.price) : null;
+
+    if (basePerPerson === null) {
+        var oldCount = Number(reservation.count || 0);
+        var oldSeatCharge = reservation.seat_pref === 'あり' ? oldCount * PREFERRED_SEAT_PRICE : 0;
+        var oldDiscount = reservation.specialMember
+            ? oldCount * SPECIAL_MEMBER_DISCOUNT_PER_PERSON
+            : Number(reservation.memberDiscountTotal || 0);
+        var oldBaseTotal = Number(reservation.amount || 0) + oldDiscount - oldSeatCharge;
+        basePerPerson = oldCount > 0 ? Math.max(Math.round(oldBaseTotal / oldCount), 0) : 0;
+    }
+
+    var seatCharge = seatPref === 'あり' ? count * PREFERRED_SEAT_PRICE : 0;
+    var discount = reservation.specialMember ? count * SPECIAL_MEMBER_DISCOUNT_PER_PERSON : 0;
+    var total = Math.max((basePerPerson * count) + seatCharge - discount, 0);
+
+    return {
+        basePerPerson: basePerPerson,
+        seatCharge: seatCharge,
+        discount: discount,
+        total: total
+    };
+}
+
+function syncReservationAmountByInputs(reservationId, overwriteAmount) {
+    var countInput = document.getElementById('edit-res-count');
+    var seatInput = document.getElementById('edit-res-seat');
+    var amountInput = document.getElementById('edit-res-amount');
+    var hint = document.getElementById('edit-res-amount-hint');
+    if (!countInput || !seatInput || !amountInput || !hint) return;
+
+    var count = parseInt(countInput.value, 10);
+    if (!count || count < 1) count = 1;
+    var seatPref = seatInput.value;
+    var calc = calculateReservationAmountForEdit(reservationId, count, seatPref);
+    if (!calc) return;
+
+    if (overwriteAmount) {
+        amountInput.value = calc.total;
+    }
+
+    hint.innerText = '自動計算: 基本 ¥' + calc.basePerPerson.toLocaleString()
+        + ' × ' + count
+        + ' + 座席 ¥' + calc.seatCharge.toLocaleString()
+        + (calc.discount > 0 ? ' - 会員割引 ¥' + calc.discount.toLocaleString() : '')
+        + ' = ¥' + calc.total.toLocaleString();
+}
+
+function onReservationEditInputsChanged(id) {
+    syncReservationAmountByInputs(id, true);
+}
+
+function recalculateReservationAmount(id) {
+    syncReservationAmountByInputs(id, true);
+}
+
+async function saveReservationEdit(id) {
+    var nameInput = document.getElementById('edit-res-name');
+    var phoneInput = document.getElementById('edit-res-phone');
+    var addressInput = document.getElementById('edit-res-address');
+    var countInput = document.getElementById('edit-res-count');
+    var seatInput = document.getElementById('edit-res-seat');
+    var amountInput = document.getElementById('edit-res-amount');
+
+    if (!nameInput || !countInput || !seatInput || !amountInput) {
+        alert('編集フォームの読み込みに失敗しました。画面を開き直してください。');
+        return;
+    }
+
+    var name = nameInput.value.trim();
+    var phone = phoneInput ? phoneInput.value.trim() : '';
+    var address = addressInput ? addressInput.value.trim() : '';
+    var count = parseInt(countInput.value, 10);
+    var pickups = getEditedPickupValues();
+    var pickup = pickups.length > 0 ? pickups[0] : '';
+    var seatPref = seatInput.value;
+    var totalPrice = parseInt(amountInput.value, 10);
+
+    if (!name) {
+        alert('氏名を入力してください');
+        return;
+    }
+    if (!count || count < 1) {
+        alert('人数は1以上で入力してください');
+        return;
+    }
+    if (isNaN(totalPrice) || totalPrice < 0) {
+        alert('合計金額は0以上で入力してください');
+        return;
+    }
+    if (pickups.length === 0) {
+        alert('乗車地を1件以上選択してください');
+        return;
+    }
 
     try {
         var payload = {
@@ -788,12 +1130,17 @@ async function saveReservationEdit(id) {
             address: address,
             passengers: count,
             pickup: pickup,
-            seatPref: seatPref
+            pickups: pickups,
+            seatPref: seatPref,
+            totalPrice: totalPrice
         };
 
-        var res = await fetch(API_BASE_URL + '/reservations/' + id, {
+        var res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
             method: 'PATCH',
-            headers: Object.assign({}, getAuthHeaders(), { 'Content-Type': 'application/json' }),
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(payload)
         });
 
@@ -851,66 +1198,117 @@ async function updateSpecialMember(id) {
     }
 }
 
+async function deleteReservationPermanent(id) {
+    var target = cachedReservations.find(function(r) { return r.id === id; }) || cachedWaitlist.find(function(r) { return r.id === id; });
+    if (!target) return;
+
+    if (!confirm('この予約を物理削除します。元に戻せません。よろしいですか？')) return;
+    if (!confirm('最終確認: 本当に削除しますか？')) return;
+
+    if (USE_MOCK) {
+        cachedReservations = cachedReservations.filter(function(r) { return r.id !== id; });
+        cachedWaitlist = cachedWaitlist.filter(function(r) { return r.id !== id; });
+        closeModal('modal-reservation-detail');
+        if (target.status === 'waitlist') {
+            switchTab('waitlist');
+        } else {
+            loadReservations();
+        }
+        alert('予約を削除しました');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            alert(errorBody.error || '予約削除に失敗しました');
+            return;
+        }
+
+        closeModal('modal-reservation-detail');
+        await loadInitialData();
+        if (target.status === 'waitlist') {
+            switchTab('waitlist');
+        } else {
+            switchTab('reservations');
+        }
+        alert('予約を削除しました');
+    } catch (err) {
+        console.error(err);
+        alert('通信エラーが発生しました');
+    }
+}
+
 // 手動予約追加 (A-04)
 async function submitManualReservation() {
-    const tourId = document.getElementById('manual-tour-id').value;
-    const name = document.getElementById('manual-name').value;
-    const phone = document.getElementById('manual-phone').value;
-    const address = document.getElementById('manual-address').value;
-    const count = parseInt(document.getElementById('manual-count').value);
-    const price = parseInt(document.getElementById('manual-price').value);
-    var selectedPickups = Array.from(document.querySelectorAll('.manual-pickup-cb:checked')).map(function(cb) { return cb.value; });
-    var pickup = selectedPickups.join(', ');
-    const seatPref = document.getElementById('manual-seat-pref').value;
+    const draft = getManualReservationDraft();
+    const price = parseInt(document.getElementById('manual-confirm-price').value, 10);
+    const pricing = calculateManualReservationPrice(draft);
 
-    const tour = cachedTours.find(function(t) { return t.id === tourId; });
+    if (!draft.tour || !pricing) {
+        alert('先に金額確認画面へ進んでください');
+        return;
+    }
+    if (!price && price !== 0) {
+        alert('合計金額を入力してください');
+        return;
+    }
+
     const newRes = {
         id: 'r_manual_' + Date.now(),
-        tour_id: tourId,
-        tour_name: tour ? tour.title : '',
-        date: tour ? tour.date : '',
-        name: name,
-        phone: phone,
-        address: address,
-        count: count,
+        tour_id: draft.tourId,
+        tour_name: draft.tour ? draft.tour.title : '',
+        date: draft.tour ? draft.tour.date : '',
+        name: draft.name,
+        phone: draft.phone,
+        address: draft.address,
+        count: draft.count,
         amount: price,
         status: 'confirmed',
         progressStatus: 'shipping',
-        pickup: pickup,
-        seat_pref: seatPref
+        pickup: draft.pickups.join(', '),
+        seat_pref: draft.seatPref,
+        specialMember: draft.specialMember,
+        memberDiscountTotal: pricing.discount
     };
 
     if (USE_MOCK) {
         cachedReservations.push(newRes);
         alert('予約を追加しました');
         closeModal('modal-add-reservation');
-        document.getElementById('form-manual-reservation').reset();
         loadReservations();
     } else {
-        if (!tour || !tour.date || !tour.title) {
+        if (!draft.tour || !draft.tour.date || !draft.tour.title) {
             alert('ツアー情報の取得に失敗しました。画面を再読み込みしてください。');
             return;
         }
 
         try {
-            const preferredSeats = Array(count).fill(seatPref === 'あり');
-            const pickups = selectedPickups.length > 0 ? selectedPickups : [];
+            const preferredSeats = Array(draft.count).fill(draft.seatPref === 'あり');
+            const pickups = draft.pickups.length > 0 ? draft.pickups : [];
 
             const payload = {
-                tour_id: tourId,
-                date: tour.date,
-                tour_title: tour.title,
-                passengers: count,
+                tour_id: draft.tourId,
+                date: draft.tour.date,
+                tour_title: draft.tour.title,
+                passengers: draft.count,
                 user_info: {
-                    name: name,
-                    phone: phone,
+                    name: draft.name,
+                    phone: draft.phone,
                     pref: '',
                     city: '',
-                    street: address
+                    street: draft.address
                 },
                 pickups: pickups,
                 preferred_seats: preferredSeats,
-                total_price: price
+                total_price: price,
+                special_member: draft.specialMember,
+                member_discount_total: pricing.discount
             };
 
             const res = await fetch(`${API_BASE_URL}/reservations`, {
@@ -929,7 +1327,6 @@ async function submitManualReservation() {
             }
 
             closeModal('modal-add-reservation');
-            document.getElementById('form-manual-reservation').reset();
             await loadInitialData();
             switchTab('reservations');
             alert('予約を追加しました');
@@ -1376,7 +1773,7 @@ function populateFilterWaitlistTourDropdown() {
     if (!select) return;
     const currentVal = select.value;
     select.innerHTML = '<option value="">すべてのツアー</option>';
-    cachedTours.forEach(function(t) {
+    cachedTours.slice().sort(sortToursByDateAsc).forEach(function(t) {
         const opt = document.createElement('option');
         opt.value = t.id;
         opt.textContent = t.date + ' ： ' + t.title;

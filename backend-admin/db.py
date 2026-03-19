@@ -95,10 +95,11 @@ def update_reservation_status(
     address=None,
     passengers=None,
     pickup=None,
+    pickups=None,
     seat_pref=None,
     total_price=None
 ):
-    """予約更新（status / progressStatus / remark / 顧客情報 / 人数 / 乗車地 / 座席 / 金額）"""
+    """予約更新（status / progressStatus / remark / 顧客情報 / 人数 / 乗車地(単数/複数) / 座席 / 金額）"""
     res_doc = db.collection('reservations').document(reservation_id).get()
     if not res_doc.exists:
         return False
@@ -157,7 +158,11 @@ def update_reservation_status(
             update_payload['passengers'] = normalized_passengers
             update_payload['count'] = normalized_passengers
 
-        if pickup is not None:
+        if pickups is not None:
+            normalized_pickups = [str(p).strip() for p in pickups if str(p).strip()]
+            update_payload['pickups'] = normalized_pickups
+            update_payload['pickup'] = normalized_pickups[0] if normalized_pickups else ''
+        elif pickup is not None:
             update_payload['pickup'] = str(pickup)
             update_payload['pickups'] = [str(pickup)] if str(pickup) else []
 
