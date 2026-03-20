@@ -16,7 +16,7 @@ gcloud run deploy backend-booking \
     --allow-unauthenticated \
     --memory 512Mi \
     --timeout 540s \
-    --set-env-vars LINE_CHANNEL_TOKEN=${LINE_CHANNEL_TOKEN}
+    --set-env-vars LINE_CHANNEL_TOKEN=${LINE_CHANNEL_TOKEN},LINE_CHANNEL_SECRET=${LINE_CHANNEL_SECRET}
 
 BOOKING_URL=$(gcloud run services describe backend-booking --platform managed --region $REGION --project $PROJECT_ID --format 'value(status.url)')
 echo "✅ backend-booking: $BOOKING_URL"
