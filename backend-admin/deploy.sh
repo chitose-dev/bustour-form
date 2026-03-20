@@ -6,6 +6,10 @@ set -e
 PROJECT_ID=${1:-your-gcp-project}
 REGION=${2:-asia-northeast1}
 
+# LINE 関連の設定（Cloud Run環境変数用）
+LINE_CHANNEL_TOKEN="7VPCSNBWd0vNEfz2VjS8sUULmmn03iFSOkii4BPy4x6VtstE3Rzr2GsZAMy/PDkeiXIrau1DFqfrxtRuSc+5SkR6F682S6r/afFOEliyR7qN5ltkANsHihzjnIPJ7hzEuea1EcTdzR3cYeeScLgH/QdB04t89/1O/w1cDnyilFU="
+LINE_CHANNEL_SECRET="c564acbcf01b421d01be87224df88f80"
+
 echo "📦 backend-admin をデプロイ中..."
 
 gcloud run deploy backend-admin \
