@@ -517,6 +517,7 @@
         }
 
         function enforceNumericZip(input) {
+            // 日本語入力を無効化し、数字とハイフンのみを許可
             const value = input.value || '';
             const cleaned = value.replace(/[^0-9\-]/g, '');
             if (value !== cleaned) {
@@ -687,9 +688,18 @@
         }
 
         function goTo(screenId) {
-            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-            window.scrollTo(0, 0);
+            try {
+                const targetScreen = document.getElementById(screenId);
+                if (!targetScreen) {
+                    throw new Error(`Screen not found: ${screenId}`);
+                }
+                document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+                targetScreen.classList.add('active');
+                window.scrollTo(0, 0);
+            } catch (err) {
+                console.error('goTo error:', err);
+                alert('画面遷移に失敗しました。ページをリロードしてください。');
+            }
         }
 
         async function selectDate(dateStr) {
@@ -1193,13 +1203,31 @@
                 });
 
                 if (response.ok) {
-                    const data = await response.json();
-                    console.log("Reservation success:", data);
-                    createCompletionScreen();
-                    goTo('screen-b06');
+                    try {
+                        const data = await response.json();
+                        console.log("Reservation success:", data);
+                        cache.isWaitlist = data.isWaitlist || false;
+                        createCompletionScreen();
+                        // 画面切り替えが成功するまで待機
+                        setTimeout(() => {
+                            try {
+                                goTo('screen-b06');
+                            } catch (err) {
+                                console.error("画面切り替えエラー:", err);
+                            }
+                        }, 100);
+                    } catch (parseErr) {
+                        console.error("Response parse error:", parseErr);
+                        alert("予約処理後のデータ取得に失敗しました。予約が完了している可能性があります。");
+                    }
                 } else {
-                    const error = await response.json();
-                    alert("予約の処理中にエラーが発生しました。しばらくしてからもう一度お試しください。");
+                    try {
+                        const error = await response.json().catch(() => ({ error: '不明なエラー' }));
+                        console.warn("API error response:", error);
+                        alert("予約の処理中にエラーが発生しました。\n" + (error.error || 'しばらくしてからもう一度お試しください。'));
+                    } catch (parseErr) {
+                        alert("予約の処理中にエラーが発生しました。しばらくしてからもう一度お試しください。");
+                    }
                 }
             } catch (err) {
                 console.error("予約API通信エラー:", err);

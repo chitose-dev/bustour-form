@@ -55,3 +55,44 @@ tbody tr:hover {
     }
     /* モバイルヘッダーがあるためサイドバーの上部ロゴを非表示にする必要はない */
 }
+
+/* インライン記録フォームのモバイル対応 */
+.inline-progress-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+    .inline-progress-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 1rem;
+    }
+}
+
+/* フォーム要素の幅制限 */
+.inline-progress-form select,
+.inline-progress-form textarea {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* テーブル行のオーバーフロー対応 */
+.progress-row-expanded {
+    overflow-x: auto;
+}
+
+/* ボタングループのスマホ対応 */
+.button-group-mobile {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.button-group-mobile button {
+    flex: 1;
+    min-width: 80px;
+}
