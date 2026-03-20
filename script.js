@@ -821,8 +821,8 @@ function loadReservations() {
         if (expandedProgressRows.has(r.id) && r.status !== 'cancelled') {
             const logRow = document.createElement('tr');
             logRow.className = 'bg-gray-50';
-            logRow.innerHTML = '<td colspan="11" class="p-3 lg:p-4 border-b">'
-                + '<div class="grid grid-cols-1 lg:grid-cols-4 gap-2 mb-3">'
+            logRow.innerHTML = '<td colspan="11" class="p-3 lg:p-4 border-b" style="max-width:100vw;">'
+                + '<div class="inline-progress-form mb-3">'
                 + '<select id="inline-progress-status-' + r.id + '" class="border p-2 rounded text-sm bg-white">'
                 + '<option value="shipping">発送</option>'
                 + '<option value="middle">中間</option>'
