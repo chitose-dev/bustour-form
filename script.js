@@ -7,7 +7,7 @@
 // 設定・定数
 // ==========================================
 const USE_MOCK = false;
-const API_BASE_URL = "https://backend-admin-v2-482800127304.asia-northeast1.run.app/api/admin";
+const API_BASE_URL = "https://backend-admin-v2-602985407433.asia-northeast1.run.app/api/admin";
 const PREFERRED_SEAT_PRICE = 500;
 const SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300;
 const MANUAL_PRICE_PLUS_PER_PERSON = 100;
