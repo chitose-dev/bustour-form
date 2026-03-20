@@ -481,6 +481,48 @@
         </div>
     </div>
 
+    <!-- 進捗記録モーダル -->
+    <div id="modal-progress-recorder" class="modal-overlay hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-5 lg:p-8 rounded-xl w-full max-w-md shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold mb-4 border-b pb-2">進捗記録</h3>
+            <input type="hidden" id="progress-modal-reservation-id">
+            <p id="progress-modal-name" class="text-sm font-bold text-gray-700 mb-3"></p>
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-600 mb-1">ステータス</label>
+                    <select id="progress-modal-status" class="w-full border p-2 rounded text-sm bg-white">
+                        <option value="shipping">発送</option>
+                        <option value="middle">中間</option>
+                        <option value="final">最終</option>
+                        <option value="need_check">要確認</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-600 mb-1">連絡手段</label>
+                    <select id="progress-modal-method" class="w-full border p-2 rounded text-sm bg-white">
+                        <option value="phone">電話</option>
+                        <option value="line_personal">個人LINE</option>
+                        <option value="line_official">公式LINE</option>
+                        <option value="email">メール</option>
+                        <option value="other">その他</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-600 mb-1">メモ</label>
+                    <textarea id="progress-modal-memo" class="w-full border p-2 rounded text-sm h-20" placeholder="メモを入力"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-2 mb-4">
+                <button onclick="saveProgressFromModal()" class="flex-1 px-4 py-2 text-sm rounded bg-indigo-600 text-white font-bold hover:bg-indigo-700">記録を保存</button>
+                <button onclick="closeModal('modal-progress-recorder')" class="px-4 py-2 text-sm rounded border bg-white font-bold hover:bg-gray-50">閉じる</button>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-gray-600 mb-2">過去記録（新しい順）</p>
+                <div id="progress-modal-history"></div>
+            </div>
+        </div>
+    </div>
+
     <script>document.write('<script src="/script.js?v=' + Date.now() + '"><\/script>');</script>
 </body>
 </html>

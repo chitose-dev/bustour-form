@@ -818,39 +818,6 @@ function loadReservations() {
         tr.onclick = function() { showReservationDetail(r.id); };
         tbody.appendChild(tr);
 
-        if (expandedProgressRows.has(r.id) && r.status !== 'cancelled') {
-            const logRow = document.createElement('tr');
-            logRow.className = 'bg-gray-50';
-            logRow.innerHTML = '<td colspan="11" class="p-3 lg:p-4 border-b" style="max-width:100vw;">'
-                + '<div class="inline-progress-form mb-3">'
-                + '<select id="inline-progress-status-' + r.id + '" class="border p-2 rounded text-sm bg-white">'
-                + '<option value="shipping">発送</option>'
-                + '<option value="middle">中間</option>'
-                + '<option value="final">最終</option>'
-                + '<option value="need_check">要確認</option>'
-                + '</select>'
-                + '<select id="inline-progress-method-' + r.id + '" class="border p-2 rounded text-sm bg-white">'
-                + '<option value="phone">電話</option>'
-                + '<option value="line_personal">個人LINE</option>'
-                + '<option value="line_official">公式LINE</option>'
-                + '<option value="email">メール</option>'
-                + '<option value="other">その他</option>'
-                + '</select>'
-                + '<input id="inline-progress-memo-' + r.id + '" class="border p-2 rounded text-sm lg:col-span-2" placeholder="メモを入力">'
-                + '</div>'
-                + '<div class="mb-3">'
-                + '<button onclick="saveInlineProgressLog(\'' + r.id + '\')" class="px-3 py-2 text-xs rounded bg-indigo-600 text-white hover:bg-indigo-700">記録を保存</button>'
-                + '<button onclick="toggleProgressRecorder(\'' + r.id + '\')" class="ml-2 px-3 py-2 text-xs rounded border bg-white hover:bg-gray-50">閉じる</button>'
-                + '</div>'
-                + '<div>'
-                + '<p class="text-xs font-bold text-gray-600 mb-2">過去記録（新しい順）</p>'
-                + '<div>' + buildProgressLogHistoryHtml(r) + '</div>'
-                + '</div>'
-                + '</td>';
-            tbody.appendChild(logRow);
-            var statusSelect = logRow.querySelector('#inline-progress-status-' + r.id);
-            if (statusSelect) statusSelect.value = latestProgress.status || 'shipping';
-        }
     });
 
     // ツアー絞り込み時に旅行日・ツアー名列を非表示
@@ -878,29 +845,28 @@ function loadReservations() {
 }
 
 function toggleProgressRecorder(id) {
-    if (expandedProgressRows.has(id)) {
-        expandedProgressRows.delete(id);
-    } else {
-        expandedProgressRows.add(id);
-    }
-    loadReservations();
+    var r = getReservationById(id);
+    if (!r) return;
+    document.getElementById('progress-modal-reservation-id').value = id;
+    document.getElementById('progress-modal-name').textContent = r.name + '（¥' + r.amount.toLocaleString() + '）';
+    var latestProgress = getLatestProgressEntry(r);
+    document.getElementById('progress-modal-status').value = latestProgress.status || 'shipping';
+    document.getElementById('progress-modal-method').value = 'phone';
+    document.getElementById('progress-modal-memo').value = '';
+    document.getElementById('progress-modal-history').innerHTML = buildProgressLogHistoryHtml(r);
+    openModal('modal-progress-recorder');
 }
 
-async function saveInlineProgressLog(id) {
-    var statusEl = document.getElementById('inline-progress-status-' + id);
-    var methodEl = document.getElementById('inline-progress-method-' + id);
-    var memoEl = document.getElementById('inline-progress-memo-' + id);
-    if (!statusEl || !methodEl || !memoEl) return;
-
-    var status = statusEl.value;
-    var method = methodEl.value;
-    var memo = memoEl.value.trim();
+async function saveProgressFromModal() {
+    var id = document.getElementById('progress-modal-reservation-id').value;
+    var status = document.getElementById('progress-modal-status').value;
+    var method = document.getElementById('progress-modal-method').value;
+    var memo = document.getElementById('progress-modal-memo').value.trim();
     var target = getReservationById(id);
     if (!target) return;
 
     var now = new Date().toISOString();
     var existingLogs = Array.isArray(target.progressLog) ? target.progressLog : [];
-    // 同一ステータスは上書き（既存を除外して先頭に追加）
     var nextLogs = existingLogs.filter(function(log) {
         return (log.status || '') !== status;
     });
@@ -915,6 +881,7 @@ async function saveInlineProgressLog(id) {
         target.progressStatus = status;
         target.progressLog = nextLogs;
         loadReservations();
+        closeModal('modal-progress-recorder');
         return;
     }
 
@@ -938,8 +905,13 @@ async function saveInlineProgressLog(id) {
         }
 
         await loadInitialData();
-        expandedProgressRows.add(id);
         loadReservations();
+        // モーダル内の履歴を更新
+        var updatedTarget = getReservationById(id);
+        if (updatedTarget) {
+            document.getElementById('progress-modal-history').innerHTML = buildProgressLogHistoryHtml(updatedTarget);
+            document.getElementById('progress-modal-memo').value = '';
+        }
     } catch (err) {
         console.error(err);
         alert('通信エラーが発生しました');
