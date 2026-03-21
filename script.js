@@ -141,6 +141,56 @@ function buildProgressLogHistoryHtml(reservation) {
 }
 
 const expandedProgressRows = new Set();
+const progressMethodPrefs = {};
+
+function getProgressMethodPrefKey(reservation) {
+    if (!reservation) return '';
+    if (reservation.lineUserId) return 'line:' + reservation.lineUserId;
+    return 'reservation:' + reservation.id;
+}
+
+function loadProgressMethodPrefs() {
+    try {
+        var raw = localStorage.getItem('progress_method_prefs_v1');
+        var data = raw ? JSON.parse(raw) : {};
+        Object.keys(progressMethodPrefs).forEach(function(key) { delete progressMethodPrefs[key]; });
+        Object.assign(progressMethodPrefs, data || {});
+    } catch (err) {
+        console.warn('Failed to load progress method prefs:', err);
+    }
+}
+
+function saveProgressMethodPrefs() {
+    try {
+        localStorage.setItem('progress_method_prefs_v1', JSON.stringify(progressMethodPrefs));
+    } catch (err) {
+        console.warn('Failed to save progress method prefs:', err);
+    }
+}
+
+function getPreferredProgressMethod(reservation, status) {
+    if (!reservation) return 'phone';
+    var logs = sortProgressLogsDesc(reservation.progressLog || []);
+    if (status) {
+        var sameStatusLog = logs.find(function(log) {
+            return (log.status || '') === status && !!log.method;
+        });
+        if (sameStatusLog && sameStatusLog.method) return sameStatusLog.method;
+    }
+    var latestWithMethod = logs.find(function(log) { return !!log.method; });
+    if (latestWithMethod && latestWithMethod.method) return latestWithMethod.method;
+
+    var prefKey = getProgressMethodPrefKey(reservation);
+    if (prefKey && progressMethodPrefs[prefKey]) return progressMethodPrefs[prefKey];
+    return 'phone';
+}
+
+function savePreferredProgressMethod(reservation, method) {
+    var prefKey = getProgressMethodPrefKey(reservation);
+    if (!prefKey || !method) return;
+    progressMethodPrefs[prefKey] = method;
+    saveProgressMethodPrefs();
+}
 
 function resolvePickupName(idOrName) {
     if (!idOrName) return null;
@@ -276,6 +326,11 @@ function sortToursByDateAsc(a, b) {
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('login-form').addEventListener('submit', handleLogin);
+    loadProgressMethodPrefs();
+    var progressStatusSelect = document.getElementById('progress-modal-status');
+    if (progressStatusSelect) {
+        progressStatusSelect.addEventListener('change', onProgressModalStatusChange);
+    }
 });
 
 async function handleLogin(e) {
@@ -774,7 +829,7 @@ function loadReservations() {
     let totalPeople = 0;
     let totalSales = 0;
     filtered.forEach(function(r) {
-        if (r.status !== 'cancelled') {
+        if (r.status !== 'cancelled' && r.status !== 'waitlist') {
             totalPeople += r.count;
             totalSales += r.amount;
         }
@@ -851,10 +906,18 @@ function toggleProgressRecorder(id) {
     document.getElementById('progress-modal-name').textContent = r.name + '（¥' + r.amount.toLocaleString() + '）';
     var latestProgress = getLatestProgressEntry(r);
     document.getElementById('progress-modal-status').value = latestProgress.status || 'shipping';
-    document.getElementById('progress-modal-method').value = 'phone';
+    document.getElementById('progress-modal-method').value = getPreferredProgressMethod(r, latestProgress.status || 'shipping');
     document.getElementById('progress-modal-memo').value = '';
     document.getElementById('progress-modal-history').innerHTML = buildProgressLogHistoryHtml(r);
     openModal('modal-progress-recorder');
+}
+
+function onProgressModalStatusChange() {
+    var id = document.getElementById('progress-modal-reservation-id').value;
+    var status = document.getElementById('progress-modal-status').value;
+    var target = getReservationById(id);
+    if (!target) return;
+    document.getElementById('progress-modal-method').value = getPreferredProgressMethod(target, status);
 }
 
 async function saveProgressFromModal() {
@@ -880,6 +943,7 @@ async function saveProgressFromModal() {
     if (USE_MOCK) {
         target.progressStatus = status;
         target.progressLog = nextLogs;
+        savePreferredProgressMethod(target, method);
         loadReservations();
         closeModal('modal-progress-recorder');
         return;
@@ -906,6 +970,7 @@ async function saveProgressFromModal() {
 
         await loadInitialData();
         loadReservations();
+        savePreferredProgressMethod(target, method);
         // モーダル内の履歴を更新
         var updatedTarget = getReservationById(id);
         if (updatedTarget) {
@@ -1594,6 +1659,7 @@ function loadTours() {
         if (t.status === 'waitlist_open') { statusColor = 'bg-orange-100 text-orange-800'; statusLabel = 'キャンセル待ち受付'; }
         if (t.status === 'stop') { statusColor = 'bg-gray-200 text-gray-800'; statusLabel = '受付停止'; }
         if (t.status === 'hidden') { statusColor = 'bg-yellow-100 text-yellow-800'; statusLabel = '非表示'; }
+        if (t.status === 'cancelled_tour') { statusColor = 'bg-yellow-100 text-yellow-800'; statusLabel = '中止'; }
 
         const pickupNames = (t.pickupIds || []).map(function(pid) {
             const p = cachedPickups.find(function(x) { return x.id === pid; });

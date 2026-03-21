@@ -259,7 +259,7 @@ def get_calendar():
                             reason = 'full'
                         elif status == 'stop':
                             reason = 'stop'
-                        elif status == 'hidden':
+                        elif status in ('hidden', 'cancelled_tour'):
                             reason = 'hidden'
             
             result[date_str] = {

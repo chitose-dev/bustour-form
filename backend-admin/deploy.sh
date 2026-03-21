@@ -3,7 +3,7 @@
 
 set -e
 
-PROJECT_ID="bustourreservation"
+PROJECT_ID="tourreserve"
 REGION="asia-northeast1"
 SERVICE_NAME="backend-admin-v2"
 
