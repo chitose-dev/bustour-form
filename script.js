@@ -1797,7 +1797,7 @@ function loadTours() {
             + '<div class="flex justify-between mb-3"><span>料金:</span><span>¥' + t.price.toLocaleString() + '</span></div>'
             + '<div class="mb-3">'
             + '<label class="text-xs text-gray-500 mb-1 block">ツアーメモ</label>'
-            + '<textarea id="tour-memo-' + t.id + '" class="w-full border rounded p-1.5 text-sm resize-none" rows="2" placeholder="手仕舞日・注意事項など">' + (t.memo || '') + '</textarea>'
+            + '<textarea id="tour-memo-' + t.id + '" class="w-full border rounded p-1.5 text-sm resize-none" rows="2" placeholder="手仕舞日・注意事項など">' + (t.memo || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>'
             + '<button onclick="saveTourMemo(\'' + t.id + '\')" class="mt-1 w-full bg-gray-100 hover:bg-gray-200 py-1 rounded text-xs text-gray-700">メモ保存</button>'
             + '</div>'
             + '<div class="flex gap-2">'
