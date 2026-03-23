@@ -142,6 +142,7 @@ function buildProgressLogHistoryHtml(reservation) {
 
 const expandedProgressRows = new Set();
 const progressMethodPrefs = {};
+const progressMemoDrafts = {};
 
 function getProgressMethodPrefKey(reservation) {
     if (!reservation) return '';
@@ -166,6 +167,54 @@ function saveProgressMethodPrefs() {
     } catch (err) {
         console.warn('Failed to save progress method prefs:', err);
     }
+}
+
+function getProgressMemoDraftKey(reservation) {
+    if (!reservation) return '';
+    if (reservation.lineUserId) return 'line:' + reservation.lineUserId;
+    return 'reservation:' + reservation.id;
+}
+
+function loadProgressMemoDrafts() {
+    try {
+        var raw = localStorage.getItem('progress_memo_drafts_v1');
+        var data = raw ? JSON.parse(raw) : {};
+        Object.keys(progressMemoDrafts).forEach(function(key) { delete progressMemoDrafts[key]; });
+        Object.assign(progressMemoDrafts, data || {});
+    } catch (err) {
+        console.warn('Failed to load progress memo drafts:', err);
+    }
+}
+
+function saveProgressMemoDrafts() {
+    try {
+        localStorage.setItem('progress_memo_drafts_v1', JSON.stringify(progressMemoDrafts));
+    } catch (err) {
+        console.warn('Failed to save progress memo drafts:', err);
+    }
+}
+
+function getPreferredProgressMemo(reservation, status) {
+    if (!reservation) return '';
+    var prefKey = getProgressMemoDraftKey(reservation);
+    if (prefKey && progressMemoDrafts[prefKey]) return progressMemoDrafts[prefKey];
+
+    var logs = sortProgressLogsDesc(reservation.progressLog || []);
+    if (status) {
+        var sameStatusLog = logs.find(function(log) {
+            return (log.status || '') === status && !!(log.memo || '').trim();
+        });
+        if (sameStatusLog) return sameStatusLog.memo || '';
+    }
+    var latestMemoLog = logs.find(function(log) { return !!(log.memo || '').trim(); });
+    return latestMemoLog ? (latestMemoLog.memo || '') : '';
+}
+
+function savePreferredProgressMemo(reservation, memo) {
+    var prefKey = getProgressMemoDraftKey(reservation);
+    if (!prefKey) return;
+    progressMemoDrafts[prefKey] = memo || '';
+    saveProgressMemoDrafts();
 }
 
 function getPreferredProgressMethod(reservation, status) {
@@ -327,9 +376,14 @@ function sortToursByDateAsc(a, b) {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('login-form').addEventListener('submit', handleLogin);
     loadProgressMethodPrefs();
+    loadProgressMemoDrafts();
     var progressStatusSelect = document.getElementById('progress-modal-status');
     if (progressStatusSelect) {
         progressStatusSelect.addEventListener('change', onProgressModalStatusChange);
+    }
+    var progressMemoInput = document.getElementById('progress-modal-memo');
+    if (progressMemoInput) {
+        progressMemoInput.addEventListener('input', onProgressModalMemoInput);
     }
 });
 
@@ -907,7 +961,7 @@ function toggleProgressRecorder(id) {
     var latestProgress = getLatestProgressEntry(r);
     document.getElementById('progress-modal-status').value = latestProgress.status || 'shipping';
     document.getElementById('progress-modal-method').value = getPreferredProgressMethod(r, latestProgress.status || 'shipping');
-    document.getElementById('progress-modal-memo').value = '';
+    document.getElementById('progress-modal-memo').value = getPreferredProgressMemo(r, latestProgress.status || 'shipping');
     document.getElementById('progress-modal-history').innerHTML = buildProgressLogHistoryHtml(r);
     openModal('modal-progress-recorder');
 }
@@ -918,6 +972,15 @@ function onProgressModalStatusChange() {
     var target = getReservationById(id);
     if (!target) return;
     document.getElementById('progress-modal-method').value = getPreferredProgressMethod(target, status);
+    document.getElementById('progress-modal-memo').value = getPreferredProgressMemo(target, status);
+}
+
+function onProgressModalMemoInput() {
+    var id = document.getElementById('progress-modal-reservation-id').value;
+    var target = getReservationById(id);
+    if (!target) return;
+    var memo = document.getElementById('progress-modal-memo').value;
+    savePreferredProgressMemo(target, memo);
 }
 
 async function saveProgressFromModal() {
@@ -930,20 +993,18 @@ async function saveProgressFromModal() {
 
     var now = new Date().toISOString();
     var existingLogs = Array.isArray(target.progressLog) ? target.progressLog : [];
-    var nextLogs = existingLogs.filter(function(log) {
-        return (log.status || '') !== status;
-    });
-    nextLogs.unshift({
+    var nextLogs = [{
         status: status,
         method: method,
         memo: memo,
         updatedAt: now
-    });
+    }].concat(existingLogs);
 
     if (USE_MOCK) {
         target.progressStatus = status;
         target.progressLog = nextLogs;
         savePreferredProgressMethod(target, method);
+        savePreferredProgressMemo(target, memo);
         loadReservations();
         closeModal('modal-progress-recorder');
         return;
@@ -971,11 +1032,12 @@ async function saveProgressFromModal() {
         await loadInitialData();
         loadReservations();
         savePreferredProgressMethod(target, method);
+        savePreferredProgressMemo(target, memo);
         // モーダル内の履歴を更新
         var updatedTarget = getReservationById(id);
         if (updatedTarget) {
             document.getElementById('progress-modal-history').innerHTML = buildProgressLogHistoryHtml(updatedTarget);
-            document.getElementById('progress-modal-memo').value = '';
+            document.getElementById('progress-modal-memo').value = getPreferredProgressMemo(updatedTarget, status);
         }
     } catch (err) {
         console.error(err);
@@ -1129,13 +1191,12 @@ async function saveProgressStatusOnly(id) {
 
     var logs = Array.isArray(target.progressLog) ? target.progressLog : [];
     var now = new Date().toISOString();
-    var nextLogs = logs.filter(function(log) { return (log.status || '') !== status; });
-    nextLogs.unshift({
+    var nextLogs = [{
         status: status,
-        method: 'other',
-        memo: '状態管理タブから更新',
+        method: getPreferredProgressMethod(target, status),
+        memo: getPreferredProgressMemo(target, status) || '状態管理タブから更新',
         updatedAt: now
-    });
+    }].concat(logs);
 
     try {
         var res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
