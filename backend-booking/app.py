@@ -2,6 +2,7 @@ import os
 import json
 from datetime import datetime
 from datetime import timedelta
+from datetime import timezone
 import smtplib
 from email.message import EmailMessage
 from flask import Flask, request, jsonify
@@ -20,6 +21,7 @@ db = firestore.Client()
 PREFERRED_SEAT_PRICE = 500
 WAITLIST_MAX = 3  # キャンセル待ち最大枠数
 SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300
+JST = timezone(timedelta(hours=9))
 LINE_CHANNEL_TOKEN = os.getenv('LINE_CHANNEL_TOKEN', 'YOUR_LINE_CHANNEL_TOKEN')
 LINE_MESSAGING_API = 'https://api.line.me/v2/bot/message/push'
 SMTP_HOST = os.getenv('SMTP_HOST', '')
@@ -34,7 +36,15 @@ SMTP_USE_TLS = os.getenv('SMTP_USE_TLS', 'true').lower() == 'true'
 # ---------------------------------
 def get_today():
     """今日の日付を YYYY-MM-DD で返す"""
-    return datetime.now().strftime('%Y-%m-%d')
+    return datetime.now(JST).strftime('%Y-%m-%d')
+
+
+def now_jst():
+    return datetime.now(JST)
+
+
+def now_jst_iso():
+    return now_jst().isoformat(timespec='seconds')
 
 def parse_date(date_str):
     """日付文字列をパース（YYYY-MM-DD）"""
@@ -138,10 +148,10 @@ def get_calendar():
     ?month=YYYY-MM
     返却: {YYYY-MM-DD: {available: bool, reason: str}}
     """
-    month = request.args.get('month') or datetime.now().strftime('%Y-%m')
+    month = request.args.get('month') or now_jst().strftime('%Y-%m')
     
     try:
-        today = datetime.now().date()
+        today = now_jst().date()
         
         # ツアー一覧を取得（期間ツアー対応のため全件から判定）
         tours_ref = db.collection('tours')
@@ -577,7 +587,7 @@ def create_reservation():
                 'status': reservation_status,
                 'progressStatus': 'shipping',
                 'remark': str((user_info or {}).get('remark') or '').strip(),
-                'createdAt': datetime.now().isoformat(),
+                'createdAt': now_jst_iso(),
                 'isManualEntry': False,
                 'isWaitlist': is_waitlist
             }
@@ -590,7 +600,7 @@ def create_reservation():
             if not is_waitlist:
                 new_count = current_count + passengers
                 if new_count >= capacity:
-                    transaction.update(tour_ref, {'status': 'full', 'updatedAt': datetime.now().isoformat()})
+                    transaction.update(tour_ref, {'status': 'full', 'updatedAt': now_jst_iso()})
             
             # 9. 顧客情報 upsert（lineUserId がある場合のみ）
             if line_user_id:
@@ -603,7 +613,7 @@ def create_reservation():
                     'city': user_info.get('city'),
                     'street': user_info.get('street'),
                     'consentAutoFill': consent_auto_fill,
-                    'updatedAt': datetime.now().isoformat()
+                    'updatedAt': now_jst_iso()
                 }
                 user_profile_ref = db.collection('user_profiles').document(line_user_id)
                 transaction.set(user_profile_ref, user_profile, merge=True)

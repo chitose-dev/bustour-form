@@ -11,6 +11,7 @@ const API_BASE_URL = "https://backend-admin-v2-482800127304.asia-northeast1.run.
 const PREFERRED_SEAT_PRICE = 500;
 const SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300;
 const MANUAL_PRICE_PLUS_PER_PERSON = 100;
+const JAPAN_TIME_ZONE = 'Asia/Tokyo';
 
 // 状態管理
 let currentAuthToken = null;
@@ -18,6 +19,49 @@ let cachedTours = [];
 let cachedReservations = [];
 let cachedPickups = [];
 let cachedWaitlist = [];
+
+function getJstDateParts(dateValue) {
+    var date = dateValue ? new Date(dateValue) : new Date();
+    if (isNaN(date.getTime())) return null;
+
+    var formatter = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: JAPAN_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    var parts = formatter.formatToParts(date);
+    var map = {};
+    parts.forEach(function(part) {
+        if (part.type !== 'literal') map[part.type] = part.value;
+    });
+    return map;
+}
+
+function toJstDateString(dateValue) {
+    var p = getJstDateParts(dateValue);
+    if (!p) return '';
+    return p.year + '-' + p.month + '-' + p.day;
+}
+
+function toJstIsoString(dateValue) {
+    var p = getJstDateParts(dateValue);
+    if (!p) return '';
+    return p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute + ':' + p.second + '+09:00';
+}
+
+function formatDateTimeForJstDisplay(dateValue) {
+    if (!dateValue) return '-';
+    var date = new Date(dateValue);
+    if (isNaN(date.getTime())) return String(dateValue);
+    var p = getJstDateParts(date);
+    if (!p) return String(dateValue);
+    return p.year + '/' + p.month + '/' + p.day + ' ' + p.hour + ':' + p.minute;
+}
 
 function getAuthHeaders() {
     return { Authorization: `Bearer ${currentAuthToken}` };
@@ -132,7 +176,7 @@ function buildProgressLogHistoryHtml(reservation) {
         return '<div class="p-2 border rounded bg-white mb-2">'
             + '<div class="flex items-center justify-between gap-2 mb-1">'
             + '<span class="px-2 py-0.5 rounded text-xs font-bold ' + meta.className + '">' + meta.label + '</span>'
-            + '<span class="text-xs text-gray-500">' + (updated || '-') + '</span>'
+            + '<span class="text-xs text-gray-500">' + formatDateTimeForJstDisplay(updated) + '</span>'
             + '</div>'
             + '<div class="text-xs text-gray-700 mb-1">手段: ' + methodLabel + '</div>'
             + '<div class="text-xs text-gray-800 whitespace-pre-wrap">' + (log.memo || '（メモなし）') + '</div>'
@@ -838,7 +882,7 @@ function downloadCSV() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toJstDateString(new Date());
     a.href = url;
     a.download = '予約台帳_' + today + '.csv';
     a.click();
@@ -991,7 +1035,7 @@ async function saveProgressFromModal() {
     var target = getReservationById(id);
     if (!target) return;
 
-    var now = new Date().toISOString();
+    var now = toJstIsoString(new Date());
     var existingLogs = Array.isArray(target.progressLog) ? target.progressLog : [];
     var nextLogs = [{
         status: status,
@@ -1190,7 +1234,7 @@ async function saveProgressStatusOnly(id) {
     if (!target) return;
 
     var logs = Array.isArray(target.progressLog) ? target.progressLog : [];
-    var now = new Date().toISOString();
+    var now = toJstIsoString(new Date());
     var nextLogs = [{
         status: status,
         method: getPreferredProgressMethod(target, status),
@@ -1817,7 +1861,7 @@ async function _submitTourInner() {
 
     // 新規作成時は過去日付を禁止
     if (!id) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toJstDateString(new Date());
         if (date < today) {
             alert('過去の日付でツアーを作成することはできません。');
             return;

@@ -1,8 +1,17 @@
 from google.cloud import firestore
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 db = firestore.Client()
 SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300
+JST = timezone(timedelta(hours=9))
+
+
+def now_jst():
+    return datetime.now(JST)
+
+
+def now_jst_iso():
+    return now_jst().isoformat(timespec='seconds')
 
 # ---------------------------------
 # 予約操作
@@ -75,7 +84,7 @@ def delete_reservation(reservation_id):
                 if tour_data.get('status') == 'full' and current_count < int(tour_data.get('capacity', 0) or 0):
                     transaction.update(tour_ref, {
                         'status': 'open',
-                        'updatedAt': datetime.now().isoformat()
+                        'updatedAt': now_jst_iso()
                     })
 
         transaction.delete(res_ref)
@@ -134,10 +143,10 @@ def update_reservation_status(
                         current_count += int(r_data.get('passengers', 0) or 0)
 
         # === 全ての書き込みをまとめて行う ===
-        update_payload = {'updatedAt': datetime.now().isoformat()}
+        update_payload = {'updatedAt': now_jst_iso()}
         if new_status is not None:
             update_payload['status'] = new_status
-            update_payload['cancelledAt'] = datetime.now().isoformat() if new_status == 'cancelled' else None
+            update_payload['cancelledAt'] = now_jst_iso() if new_status == 'cancelled' else None
         if progress_status is not None:
             update_payload['progressStatus'] = progress_status
         if remark is not None:
@@ -205,7 +214,7 @@ def update_reservation_status(
             if current_tour_status == 'full' and current_count < capacity:
                 transaction.update(tour_ref, {
                     'status': 'open',
-                    'updatedAt': datetime.now().isoformat()
+                    'updatedAt': now_jst_iso()
                 })
                 print(f"ツアー状態を full → open に復元: tour={tour_id}")
     
@@ -230,7 +239,7 @@ def _apply_member_discount_to_reservation_doc(doc_ref, data, enabled):
         'memberDiscountPerPerson': SPECIAL_MEMBER_DISCOUNT_PER_PERSON if enabled else 0,
         'memberDiscountTotal': next_discount,
         'totalPrice': next_total,
-        'updatedAt': datetime.now().isoformat()
+        'updatedAt': now_jst_iso()
     })
 
 
@@ -256,7 +265,7 @@ def set_special_member_for_reservation(reservation_id, enabled):
         'lineUserId': line_user_id,
         'enabled': bool(enabled),
         'discountPerPerson': SPECIAL_MEMBER_DISCOUNT_PER_PERSON,
-        'updatedAt': datetime.now().isoformat()
+        'updatedAt': now_jst_iso()
     }, merge=True)
 
     # 今回編集した予約1件のみに反映（既存の他予約には適用しない）
@@ -283,7 +292,7 @@ def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, 
         'memberDiscountPerPerson': SPECIAL_MEMBER_DISCOUNT_PER_PERSON if special_member else 0,
         'memberDiscountTotal': int(member_discount_total or 0),
         'isManualEntry': True,
-        'createdAt': datetime.now().isoformat()
+        'createdAt': now_jst_iso()
     }
     
     doc_ref = db.collection('reservations').document()
@@ -293,7 +302,7 @@ def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, 
 
 def get_user_active_reservations(line_user_id):
     """ユーザーの有効な予約を取得（開催日が過ぎた予約を除外）"""
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = now_jst().strftime('%Y-%m-%d')
     reservations = []
 
     query = db.collection('reservations') \
@@ -363,8 +372,8 @@ def create_tour(title, date, deadline_date, capacity, price, status='open', desc
         'description': description,
         'image_url': image_url,
         'pickupIds': pickup_ids or [],
-        'createdAt': datetime.now().isoformat(),
-        'updatedAt': datetime.now().isoformat()
+        'createdAt': now_jst_iso(),
+        'updatedAt': now_jst_iso()
     }
     doc_ref = db.collection('tours').document()
     doc_ref.set(tour)
@@ -372,7 +381,7 @@ def create_tour(title, date, deadline_date, capacity, price, status='open', desc
 
 def update_tour(tour_id, **kwargs):
     """ツアー更新。title更新時は紐づく予約の tourTitle も同時更新"""
-    kwargs['updatedAt'] = datetime.now().isoformat()
+    kwargs['updatedAt'] = now_jst_iso()
     db.collection('tours').document(tour_id).update(kwargs)
     
     # titleが更新された場合、紐づく予約の tourTitle も更新
@@ -432,8 +441,8 @@ def create_pickup(name, is_active=True, sort_order=0):
         'name': name,
         'isActive': is_active,
         'sortOrder': sort_order,
-        'createdAt': datetime.now().isoformat(),
-        'updatedAt': datetime.now().isoformat()
+        'createdAt': now_jst_iso(),
+        'updatedAt': now_jst_iso()
     }
     doc_ref = db.collection('pickups').document()
     doc_ref.set(pickup)
@@ -441,7 +450,7 @@ def create_pickup(name, is_active=True, sort_order=0):
 
 def update_pickup(pickup_id, **kwargs):
     """乗車地更新"""
-    kwargs['updatedAt'] = datetime.now().isoformat()
+    kwargs['updatedAt'] = now_jst_iso()
     db.collection('pickups').document(pickup_id).update(kwargs)
     return True
 
@@ -453,7 +462,7 @@ def delete_pickup(pickup_id):
 
 def cleanup_old_cancelled_reservations(months=3):
     """キャンセル済み予約のうち、ツアー実施日から指定月数経過したものを物理削除"""
-    cutoff_date = datetime.now() - timedelta(days=months * 30)
+    cutoff_date = now_jst() - timedelta(days=months * 30)
     cutoff_str = cutoff_date.strftime('%Y-%m-%d')
     
     deleted_count = 0
@@ -512,6 +521,6 @@ def set_customer_memo(line_user_id, memo):
     db.collection('customer_memos').document(line_user_id).set({
         'lineUserId': line_user_id,
         'memo': memo,
-        'updatedAt': datetime.now().isoformat()
+        'updatedAt': now_jst_iso()
     }, merge=True)
     return True
