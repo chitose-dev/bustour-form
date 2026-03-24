@@ -73,7 +73,8 @@ function normalizeTour(tour) {
         deadline: tour.deadline || tour.deadline_date || '',
         imageUrl: tour.imageUrl || tour.image_url || '',
         current: tour.current ?? tour.current_count ?? 0,
-        pickupIds: Array.isArray(tour.pickupIds) ? tour.pickupIds : []
+        pickupIds: Array.isArray(tour.pickupIds) ? tour.pickupIds : [],
+        memo: tour.memo || ''
     };
 }
 
@@ -845,7 +846,7 @@ function downloadCSV() {
         return matchTour && matchDate && matchStatus;
     });
 
-    const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '人数', '乗車地', '前列座席', '金額', 'ステータス', '進捗'];
+    const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '人数', '乗車地', '前列座席', '単価', '金額', 'ステータス', '進捗', 'メモ'];
     const rows = filtered.map(function(r) {
         const statusLabel = r.status === 'cancelled' ? 'キャンセル' : r.status === 'waitlist' ? 'キャンセル待ち' : r.status === 'pending' ? '予約申込中' : 'ご予約確定';
         const progressLabel = r.progressStatus === 'middle'
@@ -866,9 +867,11 @@ function downloadCSV() {
             r.count,
             formatPickupsDisplay(r),
             r.seat_pref || 'なし',
+            r.count > 0 ? Math.floor(r.amount / r.count) : 0,
             r.amount,
             statusLabel,
-            progressLabel
+            progressLabel,
+            r.manualMemo || ''
         ];
     });
 
@@ -948,14 +951,17 @@ function loadReservations() {
         const tourName = tourObj ? tourObj.title : r.tour_name;
 
         const memberMark = r.specialMember ? ' <span class="text-xs text-blue-600 font-bold">★会員</span>' : '';
+        const memoMark = r.manualMemo ? ' <span class="text-xs text-green-600" title="' + r.manualMemo.replace(/"/g, '&quot;').substring(0, 50) + '">📝</span>' : '';
+        const unitPrice = r.count > 0 ? Math.floor(r.amount / r.count) : 0;
 
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]">' + tourName + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + memoMark + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">¥' + unitPrice.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap">'
@@ -1789,6 +1795,11 @@ function loadTours() {
             + '<div class="flex justify-between mb-1"><span>予約数:</span><span class="font-bold">' + (t.current || 0) + ' / ' + t.capacity + '</span></div>'
             + waitlistLine
             + '<div class="flex justify-between mb-3"><span>料金:</span><span>¥' + t.price.toLocaleString() + '</span></div>'
+            + '<div class="mb-3">'
+            + '<label class="text-xs text-gray-500 mb-1 block">ツアーメモ</label>'
+            + '<textarea id="tour-memo-' + t.id + '" class="w-full border rounded p-1.5 text-sm resize-none" rows="2" placeholder="手仕舞日・注意事項など">' + (t.memo || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>'
+            + '<button onclick="saveTourMemo(\'' + t.id + '\')" class="mt-1 w-full bg-gray-100 hover:bg-gray-200 py-1 rounded text-xs text-gray-700">メモ保存</button>'
+            + '</div>'
             + '<div class="flex gap-2">'
             + '<button onclick="editTour(\'' + t.id + '\')" class="flex-1 bg-gray-100 hover:bg-gray-200 py-2 rounded font-bold text-gray-700 text-sm">編集</button>'
             + '<button onclick="deleteTour(\'' + t.id + '\')" class="bg-red-100 hover:bg-red-200 py-2 px-3 rounded font-bold text-red-600 text-sm"><i class="fa-solid fa-trash"></i></button>'
@@ -1949,6 +1960,24 @@ async function _submitTourInner() {
             alert('通信エラーが発生しました');
         }
     }
+}
+
+async function saveTourMemo(id) {
+    const textarea = document.getElementById('tour-memo-' + id);
+    if (!textarea) return;
+    const memo = textarea.value;
+    try {
+        const res = await fetch(`${API_BASE_URL}/tours/${id}`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memo: memo })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const t = cachedTours.find(function(x) { return x.id === id; });
+        if (t) t.memo = memo;
+        const btn = textarea.nextElementSibling;
+        if (btn) { btn.textContent = '✓ 保存済み'; setTimeout(function() { btn.textContent = 'メモ保存'; }, 2000); }
+    } catch (e) { alert('保存失敗: ' + e.message); }
 }
 
 async function deleteTour(id) {

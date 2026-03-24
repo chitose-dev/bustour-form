@@ -360,7 +360,7 @@ def get_tour(tour_id):
     data['id'] = doc.id
     return data
 
-def create_tour(title, date, deadline_date, capacity, price, status='open', description='', image_url='', pickup_ids=None):
+def create_tour(title, date, deadline_date, capacity, price, status='open', description='', image_url='', pickup_ids=None, memo=''):
     """ツアー作成"""
     tour = {
         'title': title,
@@ -372,6 +372,7 @@ def create_tour(title, date, deadline_date, capacity, price, status='open', desc
         'description': description,
         'image_url': image_url,
         'pickupIds': pickup_ids or [],
+        'memo': memo,
         'createdAt': now_jst_iso(),
         'updatedAt': now_jst_iso()
     }
