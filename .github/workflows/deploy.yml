@@ -1,0 +1,85 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # ── backend-admin の変更チェック & デプロイ ──────────────────
+  deploy-backend-admin:
+    name: Deploy backend-admin to Cloud Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for backend-admin changes
+        id: check
+        run: |
+          git diff --name-only HEAD~1 HEAD | grep -q "^backend-admin/" && echo "changed=true" >> $GITHUB_OUTPUT || echo "changed=false" >> $GITHUB_OUTPUT
+
+      - name: Authenticate to Google Cloud
+        if: steps.check.outputs.changed == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        if: steps.check.outputs.changed == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy backend-admin
+        if: steps.check.outputs.changed == 'true'
+        working-directory: backend-admin
+        run: |
+          gcloud run deploy backend-admin-v2 \
+            --source . \
+            --platform managed \
+            --region asia-northeast1 \
+            --project tourreserve \
+            --allow-unauthenticated \
+            --memory 512Mi \
+            --timeout 540s \
+            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }},ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }},LINE_CHANNEL_TOKEN=${{ secrets.ADMIN_LINE_CHANNEL_TOKEN }},LINE_CHANNEL_SECRET=${{ secrets.ADMIN_LINE_CHANNEL_SECRET }},IMGUR_CLIENT_ID=${{ secrets.IMGUR_CLIENT_ID }}"
+          echo "✅ backend-admin-v2 デプロイ完了"
+
+  # ── backend-booking の変更チェック & デプロイ ──────────────────
+  deploy-backend-booking:
+    name: Deploy backend-booking to Cloud Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for backend-booking changes
+        id: check
+        run: |
+          git diff --name-only HEAD~1 HEAD | grep -q "^backend-booking/" && echo "changed=true" >> $GITHUB_OUTPUT || echo "changed=false" >> $GITHUB_OUTPUT
+
+      - name: Authenticate to Google Cloud
+        if: steps.check.outputs.changed == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        if: steps.check.outputs.changed == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy backend-booking
+        if: steps.check.outputs.changed == 'true'
+        working-directory: backend-booking
+        run: |
+          gcloud run deploy backend-booking-v2 \
+            --source . \
+            --platform managed \
+            --region asia-northeast1 \
+            --project tourreserve \
+            --allow-unauthenticated \
+            --memory 512Mi \
+            --timeout 540s \
+            --set-env-vars "LINE_CHANNEL_TOKEN=${{ secrets.BOOKING_LINE_CHANNEL_TOKEN }},LINE_CHANNEL_SECRET=${{ secrets.BOOKING_LINE_CHANNEL_SECRET }}"
+          echo "✅ backend-booking-v2 デプロイ完了"
+
+  # ── GitHub Pages（フロントエンド）は自動反映 ──────────────────
+  # index.html / admin.html / script.js / style.css の変更は
+  # mainへのpushでGitHub Pagesに自動反映されます（設定済みの場合）
