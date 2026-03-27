@@ -1,7 +1,22 @@
 from google.cloud import firestore
 from datetime import datetime, timedelta, timezone
+import os
+import json
+import base64
+import google.auth
+from google.oauth2 import service_account
 
-db = firestore.Client()
+# FIREBASE_SA_KEY_B64 環境変数があればそのSAキーを使用（bustourreservationプロジェクトへのアクセス）
+_sa_key_b64 = os.environ.get('FIREBASE_SA_KEY_B64')
+if _sa_key_b64:
+    _sa_info = json.loads(base64.b64decode(_sa_key_b64).decode())
+    _credentials = service_account.Credentials.from_service_account_info(
+        _sa_info,
+        scopes=["https://www.googleapis.com/auth/datastore"]
+    )
+    db = firestore.Client(project=_sa_info.get('project_id'), credentials=_credentials)
+else:
+    db = firestore.Client()
 SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300
 JST = timezone(timedelta(hours=9))
 

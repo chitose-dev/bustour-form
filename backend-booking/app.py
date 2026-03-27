@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
@@ -8,6 +9,7 @@ from email.message import EmailMessage
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from google.cloud import firestore
+from google.oauth2 import service_account
 from functools import wraps
 import requests
 
@@ -15,7 +17,17 @@ app = Flask(__name__)
 CORS(app)
 
 # Firebase/Firestore初期化
-db = firestore.Client()
+# FIREBASE_SA_KEY_B64 環境変数があればそのSAキーを使用
+_sa_key_b64 = os.environ.get('FIREBASE_SA_KEY_B64')
+if _sa_key_b64:
+    _sa_info = json.loads(base64.b64decode(_sa_key_b64).decode())
+    _credentials = service_account.Credentials.from_service_account_info(
+        _sa_info,
+        scopes=["https://www.googleapis.com/auth/datastore"]
+    )
+    db = firestore.Client(project=_sa_info.get('project_id'), credentials=_credentials)
+else:
+    db = firestore.Client()
 
 # 定数
 PREFERRED_SEAT_PRICE = 500
