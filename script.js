@@ -759,8 +759,9 @@ function calculateManualReservationPrice(draft) {
     var lmEnabled = !!draft.tour.lastMinuteDiscountEnabled;
     var lmAmount = Number(draft.tour.lastMinuteDiscountAmount || 0);
 
-    // 割引候補: LINE割引(100) / 特別会員(300) / 直前割引(任意額)
-    var candidates = [MANUAL_PRICE_PLUS_PER_PERSON];
+    // 割引候補: 特別会員(300) / 直前割引(任意額)
+    // ※手動予約はLINE割引を適用しない
+    var candidates = [0];
     if (draft.specialMember) candidates.push(SPECIAL_MEMBER_DISCOUNT_PER_PERSON);
     if (lmEnabled && lmAmount > 0) candidates.push(lmAmount);
     var discountPerPerson = Math.max.apply(null, candidates);
@@ -1473,9 +1474,11 @@ function calculateReservationAmountForEdit(reservationId, count, seatPref) {
     }
 
     // 割引計算: 有利な方1つのみ
+    // 手動予約(isManualEntry)はLINE割引なし、LINE予約は100円割引
     var lmEnabled = tour ? !!tour.lastMinuteDiscountEnabled : false;
     var lmAmount = tour ? Number(tour.lastMinuteDiscountAmount || 0) : 0;
-    var candidates = [MANUAL_PRICE_PLUS_PER_PERSON];
+    var isManual = !!reservation.isManualEntry;
+    var candidates = isManual ? [0] : [MANUAL_PRICE_PLUS_PER_PERSON];
     if (reservation.specialMember) candidates.push(SPECIAL_MEMBER_DISCOUNT_PER_PERSON);
     if (lmEnabled && lmAmount > 0) candidates.push(lmAmount);
     var discountPerPerson = Math.max.apply(null, candidates);
