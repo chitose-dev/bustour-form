@@ -826,9 +826,18 @@ function showManualReservationPreview() {
 
     var discountRow = document.getElementById('manual-breakdown-discount-row');
     var discountValue = document.getElementById('manual-breakdown-discount');
+    var discountLabel = document.getElementById('manual-breakdown-discount-label');
     if (pricing.discount > 0) {
         discountRow.classList.remove('hidden');
         discountValue.innerText = '-¥' + pricing.discount.toLocaleString();
+        // 割引の種類をラベルに表示
+        var discLabel = 'LINE割引（-' + pricing.discountPerPerson + '円×' + draft.count + '名）';
+        if (draft.specialMember && pricing.discountPerPerson === SPECIAL_MEMBER_DISCOUNT_PER_PERSON) {
+            discLabel = '特別会員割引（-' + pricing.discountPerPerson + '円×' + draft.count + '名）';
+        } else if (draft.tour.lastMinuteDiscountEnabled && pricing.discountPerPerson === Number(draft.tour.lastMinuteDiscountAmount)) {
+            discLabel = '直前割引（-' + pricing.discountPerPerson + '円×' + draft.count + '名）';
+        }
+        if (discountLabel) discountLabel.innerText = discLabel;
     } else {
         discountRow.classList.add('hidden');
         discountValue.innerText = '-¥0';
