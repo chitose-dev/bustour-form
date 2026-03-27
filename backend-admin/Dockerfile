@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 ENV FLASK_APP=app.py
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-key.json
+# GOOGLE_APPLICATION_CREDENTIALS はCloud RunのサービスアカウントでADCを使用
 
 EXPOSE 8080
 
