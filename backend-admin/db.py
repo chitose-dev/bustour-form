@@ -360,7 +360,8 @@ def get_tour(tour_id):
     data['id'] = doc.id
     return data
 
-def create_tour(title, date, deadline_date, capacity, price, status='open', description='', image_url='', pickup_ids=None, memo=''):
+def create_tour(title, date, deadline_date, capacity, price, status='open', description='', image_url='', pickup_ids=None, memo='',
+                 list_price=None, last_minute_discount_enabled=False, last_minute_discount_amount=0):
     """ツアー作成"""
     tour = {
         'title': title,
@@ -368,6 +369,9 @@ def create_tour(title, date, deadline_date, capacity, price, status='open', desc
         'deadline_date': deadline_date,
         'capacity': capacity,
         'price': price,
+        'listPrice': list_price if list_price is not None else price + 100,
+        'lastMinuteDiscountEnabled': bool(last_minute_discount_enabled),
+        'lastMinuteDiscountAmount': int(last_minute_discount_amount or 0),
         'status': status,
         'description': description,
         'image_url': image_url,
@@ -382,6 +386,13 @@ def create_tour(title, date, deadline_date, capacity, price, status='open', desc
 
 def update_tour(tour_id, **kwargs):
     """ツアー更新。title更新時は紐づく予約の tourTitle も同時更新"""
+    # listPrice / lastMinuteDiscountEnabled / lastMinuteDiscountAmount の型正規化
+    if 'listPrice' in kwargs:
+        kwargs['listPrice'] = int(kwargs['listPrice'])
+    if 'lastMinuteDiscountEnabled' in kwargs:
+        kwargs['lastMinuteDiscountEnabled'] = bool(kwargs['lastMinuteDiscountEnabled'])
+    if 'lastMinuteDiscountAmount' in kwargs:
+        kwargs['lastMinuteDiscountAmount'] = int(kwargs['lastMinuteDiscountAmount'] or 0)
     kwargs['updatedAt'] = now_jst_iso()
     db.collection('tours').document(tour_id).update(kwargs)
     

@@ -459,6 +459,16 @@
                             </select>
                         </div>
                     </div>
+                    <div class="p-3 bg-orange-50 border border-orange-200 rounded-lg space-y-3">
+                        <label class="flex items-center gap-2 text-sm font-bold text-orange-900 cursor-pointer">
+                            <input type="checkbox" id="edit-tour-lm-enabled" class="w-4 h-4" onchange="toggleLastMinuteAmount()">
+                            <span>直前割引を有効にする</span>
+                        </label>
+                        <div id="edit-tour-lm-amount-wrap" class="hidden">
+                            <label class="block font-bold text-sm mb-1">直前割引額（1人あたり）</label>
+                            <input type="number" id="edit-tour-lm-amount" class="w-full border p-2 rounded" min="0" value="0" placeholder="例: 500">
+                        </div>
+                    </div>
                     <div>
                         <label class="block font-bold text-sm mb-1">説明文</label>
                         <textarea id="edit-tour-desc" class="w-full border p-2 rounded h-20"></textarea>

@@ -21,6 +21,7 @@ db = firestore.Client()
 PREFERRED_SEAT_PRICE = 500
 WAITLIST_MAX = 3  # キャンセル待ち最大枠数
 SPECIAL_MEMBER_DISCOUNT_PER_PERSON = 300
+LINE_DISCOUNT = 100
 JST = timezone(timedelta(hours=9))
 LINE_CHANNEL_TOKEN = os.getenv('LINE_CHANNEL_TOKEN', 'YOUR_LINE_CHANNEL_TOKEN')
 LINE_MESSAGING_API = 'https://api.line.me/v2/bot/message/push'
@@ -333,6 +334,9 @@ def get_tours():
                 'id': tour_id,
                 'title': tour_data.get('title'),
                 'price': tour_data.get('price'),
+                'listPrice': tour_data.get('listPrice', tour_data.get('price', 0) + 100),
+                'lastMinuteDiscountEnabled': tour_data.get('lastMinuteDiscountEnabled', False),
+                'lastMinuteDiscountAmount': tour_data.get('lastMinuteDiscountAmount', 0),
                 'status': tour_data.get('status'),
                 'image_url': tour_data.get('image_url'),
                 'description': tour_data.get('description'),
@@ -409,25 +413,48 @@ def get_pickups():
 def price_preview():
     """
     料金プレビュー（オプション）
-    POST {passengers, pricePerPerson, preferredSeats}
-    返却: {baseTour, seatPrice, total}
+    POST {tourId, passengers, preferredSeats, lineUserId}
+    返却: {listPrice, discountPerPerson, baseTour, seatPrice, total}
     """
     try:
         data = request.get_json()
-        passengers = data.get('passengers', 0)
-        price_per_person = data.get('pricePerPerson', 0)
+        tour_id = data.get('tourId')
+        passengers = int(data.get('passengers', 0))
         preferred_seats = data.get('preferredSeats', [])
-        
-        base_tour = passengers * price_per_person
+        line_user_id = data.get('lineUserId', '')
+
+        # ツアー情報から listPrice / 直前割引を取得
+        list_price = int(data.get('listPrice', 0))
+        lm_enabled = False
+        lm_amount = 0
+        if tour_id:
+            tour_doc = db.collection('tours').document(tour_id).get()
+            if tour_doc.exists:
+                td = tour_doc.to_dict()
+                list_price = td.get('listPrice', td.get('price', 0) + 100)
+                lm_enabled = td.get('lastMinuteDiscountEnabled', False)
+                lm_amount = td.get('lastMinuteDiscountAmount', 0)
+
+        is_member = is_special_member(line_user_id) if line_user_id else False
+        discount_candidates = [LINE_DISCOUNT]
+        if is_member:
+            discount_candidates.append(SPECIAL_MEMBER_DISCOUNT_PER_PERSON)
+        if lm_enabled and lm_amount and int(lm_amount) > 0:
+            discount_candidates.append(int(lm_amount))
+        discount_per_person = max(discount_candidates)
+
+        base_tour = passengers * max(list_price - discount_per_person, 0)
         seat_price = len([s for s in preferred_seats if s]) * PREFERRED_SEAT_PRICE
         total = base_tour + seat_price
-        
+
         return jsonify({
+            'listPrice': list_price,
+            'discountPerPerson': discount_per_person,
             'baseTour': base_tour,
             'seatPrice': seat_price,
             'total': total
         }), 200
-    
+
     except Exception as e:
         print(f"Price preview error: {e}")
         return jsonify({'error': str(e)}), 500
@@ -559,14 +586,24 @@ def create_reservation():
             if not is_waitlist and current_count + passengers > capacity:
                 raise ValueError('Capacity exceeded')
             
-            # 7. 予約作成
+            # 7. 予約作成 — 新料金ロジック（有利な方1つのみ適用）
             seat_upcharge = len([s for s in preferred_seats if s]) * PREFERRED_SEAT_PRICE
-            member_discount_total = 0
             is_member = is_special_member(line_user_id)
-            if is_member:
-                member_discount_total = passengers * SPECIAL_MEMBER_DISCOUNT_PER_PERSON
 
-            total_price = max(passengers * price_per_person + seat_upcharge - member_discount_total, 0)
+            list_price = tour_data.get('listPrice', tour_data.get('price', 0) + 100)
+            lm_enabled = tour_data.get('lastMinuteDiscountEnabled', False)
+            lm_amount = tour_data.get('lastMinuteDiscountAmount', 0)
+
+            # 割引候補: LINE割引(100) / 特別会員(300) / 直前割引(任意額) → max
+            discount_candidates = [LINE_DISCOUNT]
+            if is_member:
+                discount_candidates.append(SPECIAL_MEMBER_DISCOUNT_PER_PERSON)
+            if lm_enabled and lm_amount and int(lm_amount) > 0:
+                discount_candidates.append(int(lm_amount))
+            discount_per_person = max(discount_candidates)
+
+            member_discount_total = discount_per_person * passengers
+            total_price = max(passengers * (list_price - discount_per_person) + seat_upcharge, 0)
             
             reservation_status = 'waitlist' if is_waitlist else 'pending'
             reservation = {

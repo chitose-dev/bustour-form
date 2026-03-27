@@ -692,6 +692,9 @@ function openModal(modalId) {
     if (modalId === 'modal-tour-editor' && !document.getElementById('edit-tour-id').value) {
         document.getElementById('form-tour-editor').reset();
         document.getElementById('edit-tour-id').value = '';
+        document.getElementById('edit-tour-lm-enabled').checked = false;
+        document.getElementById('edit-tour-lm-amount').value = 0;
+        document.getElementById('edit-tour-lm-amount-wrap').classList.add('hidden');
         var allPickupIds = cachedPickups.filter(function(p) { return p.active; }).map(function(p) { return p.id; });
         renderTourPickupCheckboxes(allPickupIds);
     }
@@ -751,17 +754,27 @@ function getManualReservationDraft() {
 
 function calculateManualReservationPrice(draft) {
     if (!draft.tour) return null;
-    var baseUnitPrice = Number(draft.tour.price || 0) + MANUAL_PRICE_PLUS_PER_PERSON;
+    var listPrice = Number(draft.tour.listPrice || (Number(draft.tour.price || 0) + 100));
+    var lmEnabled = !!draft.tour.lastMinuteDiscountEnabled;
+    var lmAmount = Number(draft.tour.lastMinuteDiscountAmount || 0);
+
+    // 割引候補: LINE割引(100) / 特別会員(300) / 直前割引(任意額)
+    var candidates = [MANUAL_PRICE_PLUS_PER_PERSON];
+    if (draft.specialMember) candidates.push(SPECIAL_MEMBER_DISCOUNT_PER_PERSON);
+    if (lmEnabled && lmAmount > 0) candidates.push(lmAmount);
+    var discountPerPerson = Math.max.apply(null, candidates);
+
+    var baseUnitPrice = Math.max(listPrice - discountPerPerson, 0);
     var baseTotal = baseUnitPrice * draft.count;
     var seatCharge = draft.seatPref === 'あり' ? draft.count * PREFERRED_SEAT_PRICE : 0;
-    var discount = draft.specialMember ? draft.count * SPECIAL_MEMBER_DISCOUNT_PER_PERSON : 0;
-    var total = Math.max(baseTotal + seatCharge - discount, 0);
+    var total = Math.max(baseTotal + seatCharge, 0);
 
     return {
-        baseUnitPrice: baseUnitPrice,
-        baseTotal: baseTotal,
+        baseUnitPrice: listPrice,
+        baseTotal: listPrice * draft.count,
         seatCharge: seatCharge,
-        discount: discount,
+        discount: discountPerPerson * draft.count,
+        discountPerPerson: discountPerPerson,
         total: total
     };
 }
@@ -952,7 +965,7 @@ function loadReservations() {
 
         const memberMark = r.specialMember ? ' <span class="text-xs text-blue-600 font-bold">★会員</span>' : '';
         const memoMark = r.manualMemo ? ' <span class="text-xs text-green-600" title="' + r.manualMemo.replace(/"/g, '&quot;').substring(0, 50) + '">📝</span>' : '';
-        const unitPrice = r.count > 0 ? Math.floor(r.amount / r.count) : 0;
+        const unitPrice = tourObj ? (tourObj.listPrice || (tourObj.price + 100)) : (r.count > 0 ? Math.floor(r.amount / r.count) : 0);
 
         tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]">' + tourName + '</td>'
@@ -1439,24 +1452,30 @@ function calculateReservationAmountForEdit(reservationId, count, seatPref) {
     if (!reservation) return null;
 
     var tour = cachedTours.find(function(t) { return t.id === reservation.tour_id; });
-    var basePerPerson = tour && !isNaN(Number(tour.price)) ? Number(tour.price) : null;
+    var listPrice = tour ? Number(tour.listPrice || (Number(tour.price || 0) + 100)) : null;
 
-    if (basePerPerson === null) {
+    if (listPrice === null) {
         var oldCount = Number(reservation.count || 0);
         var oldSeatCharge = reservation.seat_pref === 'あり' ? oldCount * PREFERRED_SEAT_PRICE : 0;
-        var oldDiscount = reservation.specialMember
-            ? oldCount * SPECIAL_MEMBER_DISCOUNT_PER_PERSON
-            : Number(reservation.memberDiscountTotal || 0);
+        var oldDiscount = Number(reservation.memberDiscountTotal || 0);
         var oldBaseTotal = Number(reservation.amount || 0) + oldDiscount - oldSeatCharge;
-        basePerPerson = oldCount > 0 ? Math.max(Math.round(oldBaseTotal / oldCount), 0) : 0;
+        listPrice = oldCount > 0 ? Math.max(Math.round(oldBaseTotal / oldCount), 0) : 0;
     }
 
+    // 割引計算: 有利な方1つのみ
+    var lmEnabled = tour ? !!tour.lastMinuteDiscountEnabled : false;
+    var lmAmount = tour ? Number(tour.lastMinuteDiscountAmount || 0) : 0;
+    var candidates = [MANUAL_PRICE_PLUS_PER_PERSON];
+    if (reservation.specialMember) candidates.push(SPECIAL_MEMBER_DISCOUNT_PER_PERSON);
+    if (lmEnabled && lmAmount > 0) candidates.push(lmAmount);
+    var discountPerPerson = Math.max.apply(null, candidates);
+
     var seatCharge = seatPref === 'あり' ? count * PREFERRED_SEAT_PRICE : 0;
-    var discount = reservation.specialMember ? count * SPECIAL_MEMBER_DISCOUNT_PER_PERSON : 0;
-    var total = Math.max((basePerPerson * count) + seatCharge - discount, 0);
+    var discount = discountPerPerson * count;
+    var total = Math.max((listPrice - discountPerPerson) * count + seatCharge, 0);
 
     return {
-        basePerPerson: basePerPerson,
+        basePerPerson: listPrice,
         seatCharge: seatCharge,
         discount: discount,
         total: total
@@ -1794,7 +1813,9 @@ function loadTours() {
             + '<div class="mt-auto pt-4 border-t border-gray-100 text-sm">'
             + '<div class="flex justify-between mb-1"><span>予約数:</span><span class="font-bold">' + (t.current || 0) + ' / ' + t.capacity + '</span></div>'
             + waitlistLine
-            + '<div class="flex justify-between mb-3"><span>料金:</span><span>¥' + t.price.toLocaleString() + '</span></div>'
+            + '<div class="flex justify-between mb-1"><span>定価:</span><span>¥' + (t.listPrice || (t.price + 100)).toLocaleString() + '</span></div>'
+            + (t.lastMinuteDiscountEnabled ? '<div class="flex justify-between mb-1"><span class="text-orange-600">直前割引:</span><span class="font-bold text-orange-600">-¥' + (t.lastMinuteDiscountAmount || 0).toLocaleString() + '</span></div>' : '')
+            + '<div class="flex justify-between mb-3"><span>LINE価格:</span><span>¥' + t.price.toLocaleString() + '</span></div>'
             + '<div class="mb-3">'
             + '<label class="text-xs text-gray-500 mb-1 block">ツアーメモ</label>'
             + '<textarea id="tour-memo-' + t.id + '" class="w-full border rounded p-1.5 text-sm resize-none" rows="2" placeholder="手仕舞日・注意事項など">' + (t.memo || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea>'
@@ -1806,6 +1827,14 @@ function loadTours() {
             + '</div></div>';
         grid.appendChild(div);
     });
+}
+
+function toggleLastMinuteAmount() {
+    var enabled = document.getElementById('edit-tour-lm-enabled').checked;
+    document.getElementById('edit-tour-lm-amount-wrap').classList.toggle('hidden', !enabled);
+    if (!enabled) {
+        document.getElementById('edit-tour-lm-amount').value = 0;
+    }
 }
 
 function renderTourPickupCheckboxes(selectedIds) {
@@ -1836,7 +1865,12 @@ function editTour(id) {
     document.getElementById('edit-tour-status').value = t.status;
     document.getElementById('edit-tour-desc').value = t.description || '';
     document.getElementById('edit-tour-img').value = t.imageUrl || '';
-    
+
+    var lmEnabled = !!t.lastMinuteDiscountEnabled;
+    document.getElementById('edit-tour-lm-enabled').checked = lmEnabled;
+    document.getElementById('edit-tour-lm-amount').value = t.lastMinuteDiscountAmount || 0;
+    document.getElementById('edit-tour-lm-amount-wrap').classList.toggle('hidden', !lmEnabled);
+
     renderTourPickupCheckboxes(t.pickupIds || []);
     openModal('modal-tour-editor');
 }
@@ -1918,16 +1952,22 @@ async function _submitTourInner() {
         loadTours();
     } else {
         try {
+            var lmEnabled = document.getElementById('edit-tour-lm-enabled').checked;
+            var lmAmount = parseInt(document.getElementById('edit-tour-lm-amount').value) || 0;
+
             const payload = {
                 title: title,
                 date: date,
                 deadline_date: deadline,
                 capacity: capacity,
                 price: price,
+                listPrice: price + 100,
                 status: status,
                 description: description,
                 image_url: imageUrl,
-                pickupIds: pickupIds
+                pickupIds: pickupIds,
+                lastMinuteDiscountEnabled: lmEnabled,
+                lastMinuteDiscountAmount: lmAmount
             };
 
             const isEdit = !!id;
