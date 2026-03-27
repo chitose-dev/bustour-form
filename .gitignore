@@ -2,7 +2,8 @@ firebase-key.json
 **/firebase-key.json
 form.html
 .firebase/
-.firebaserc
-firebase.json
+# .firebaserc と firebase.json はリポジトリで管理（Hosting設定）
+# .firebaserc
+# firebase.json
 public/
 .DS_Store

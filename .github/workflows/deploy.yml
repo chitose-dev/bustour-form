@@ -80,6 +80,24 @@ jobs:
             --set-env-vars "LINE_CHANNEL_TOKEN=${{ secrets.BOOKING_LINE_CHANNEL_TOKEN }},LINE_CHANNEL_SECRET=${{ secrets.BOOKING_LINE_CHANNEL_SECRET }}"
           echo "✅ backend-booking-v2 デプロイ完了"
 
-  # ── GitHub Pages（フロントエンド）は自動反映 ──────────────────
-  # index.html / admin.html / script.js / style.css の変更は
-  # mainへのpushでGitHub Pagesに自動反映されます（設定済みの場合）
+  # ── Firebase Hosting（フロントエンド）デプロイ ──────────────────
+  deploy-hosting:
+    name: Deploy to Firebase Hosting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for frontend changes
+        id: check
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E "^(index\.html|admin\.html|script\.js|style\.css|firebase\.json|\.firebaserc)$" | wc -l)
+          echo "changed=$( [ $CHANGED -gt 0 ] && echo true || echo false )" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Firebase Hosting
+        if: steps.check.outputs.changed == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: bustourreservation
+          channelId: live
