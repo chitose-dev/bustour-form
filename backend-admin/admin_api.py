@@ -314,7 +314,13 @@ def create_tour_api():
             return jsonify({'error': 'required fields missing'}), 400
         
         memo = data.get('memo', '')
-        tour_id = create_tour(title, date, deadline_date, capacity, price, status, description, image_url, pickup_ids, memo)
+        list_price = data.get('listPrice')
+        last_minute_discount_enabled = bool(data.get('lastMinuteDiscountEnabled', False))
+        last_minute_discount_amount = int(data.get('lastMinuteDiscountAmount', 0) or 0)
+        tour_id = create_tour(title, date, deadline_date, capacity, price, status, description, image_url, pickup_ids, memo,
+                              list_price=list_price,
+                              last_minute_discount_enabled=last_minute_discount_enabled,
+                              last_minute_discount_amount=last_minute_discount_amount)
         return jsonify({'id': tour_id, 'message': 'Tour created'}), 201
     
     except Exception as e:
@@ -335,7 +341,8 @@ def update_tour_api(tour_id):
         
         # 更新するフィールドのみ抽出
         update_fields = {}
-        for field in ['title', 'date', 'deadline_date', 'capacity', 'price', 'status', 'description', 'image_url', 'pickupIds', 'memo']:
+        for field in ['title', 'date', 'deadline_date', 'capacity', 'price', 'status', 'description', 'image_url', 'pickupIds', 'memo',
+                      'listPrice', 'lastMinuteDiscountEnabled', 'lastMinuteDiscountAmount']:
             if field in data:
                 update_fields[field] = data[field]
         
