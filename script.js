@@ -1016,6 +1016,15 @@ function loadReservations() {
             row.cells[0].style.display = 'none';
             row.cells[1].style.display = 'none';
         });
+        // ツアーメモエリアを表示
+        var memoArea = document.getElementById('tour-memo-area');
+        var memoTextarea = document.getElementById('tour-memo-ledger');
+        if (memoArea && memoTextarea) {
+            var selectedTour = cachedTours.find(function(t) { return t.id === filterTourId; });
+            memoTextarea.value = selectedTour ? (selectedTour.memo || '') : '';
+            memoTextarea.dataset.tourId = filterTourId;
+            memoArea.classList.remove('hidden');
+        }
     } else {
         // ツアー未選択時は表示
         headers[0].style.display = '';
@@ -1024,6 +1033,9 @@ function loadReservations() {
             row.cells[0].style.display = '';
             row.cells[1].style.display = '';
         });
+        // ツアーメモエリアを非表示
+        var memoArea = document.getElementById('tour-memo-area');
+        if (memoArea) memoArea.classList.add('hidden');
     }
 }
 
@@ -2047,6 +2059,28 @@ async function _submitTourInner() {
             console.error(err);
             alert('通信エラーが発生しました');
         }
+    }
+}
+
+async function saveTourMemoFromLedger() {
+    const textarea = document.getElementById('tour-memo-ledger');
+    if (!textarea) return;
+    const id = textarea.dataset.tourId;
+    if (!id) return;
+    const memo = textarea.value;
+    try {
+        const res = await fetch(API_BASE + '/tours/' + id, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memo: memo })
+        });
+        if (!res.ok) throw new Error('保存失敗');
+        // キャッシュ更新
+        const tour = cachedTours.find(function(t) { return t.id === id; });
+        if (tour) tour.memo = memo;
+        alert('ツアーメモを保存しました');
+    } catch (err) {
+        alert('保存に失敗しました: ' + err.message);
     }
 }
 
