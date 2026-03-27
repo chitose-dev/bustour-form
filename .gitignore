@@ -7,3 +7,4 @@ form.html
 # firebase.json
 public/
 .DS_Store
+firebase-debug.log
