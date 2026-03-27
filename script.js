@@ -695,6 +695,7 @@ function openModal(modalId) {
         document.getElementById('edit-tour-lm-enabled').checked = false;
         document.getElementById('edit-tour-lm-amount').value = 0;
         document.getElementById('edit-tour-lm-amount-wrap').classList.add('hidden');
+        document.getElementById('price-preview-box').classList.add('hidden');
         var allPickupIds = cachedPickups.filter(function(p) { return p.active; }).map(function(p) { return p.id; });
         renderTourPickupCheckboxes(allPickupIds);
     }
@@ -1835,6 +1836,38 @@ function toggleLastMinuteAmount() {
     if (!enabled) {
         document.getElementById('edit-tour-lm-amount').value = 0;
     }
+    updatePricePreview();
+}
+
+function updatePricePreview() {
+    var price = parseInt(document.getElementById('edit-tour-price').value) || 0;
+    var lmEnabled = document.getElementById('edit-tour-lm-enabled').checked;
+    var lmAmount = parseInt(document.getElementById('edit-tour-lm-amount').value) || 0;
+    var box = document.getElementById('price-preview-box');
+
+    if (!price) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+
+    var listPrice = price + 100;  // 定価 = LINE割引後 + 100
+    var linePrice = price;        // = listPrice - 100
+    var memberPrice = listPrice - 300;  // 特別会員 = 定価 - 300
+
+    document.getElementById('preview-list-price').textContent = '¥' + listPrice.toLocaleString();
+    document.getElementById('preview-line-price').textContent = '¥' + linePrice.toLocaleString();
+    document.getElementById('preview-member-price').textContent = '¥' + Math.max(memberPrice, 0).toLocaleString();
+
+    var lmRow = document.getElementById('preview-lm-row');
+    if (lmEnabled && lmAmount > 0) {
+        var lmPrice = Math.max(listPrice - lmAmount, 0);
+        document.getElementById('preview-lm-label').textContent = '直前割引（-' + lmAmount.toLocaleString() + '円）';
+        document.getElementById('preview-lm-price').textContent = '¥' + lmPrice.toLocaleString();
+        lmRow.classList.remove('hidden');
+        // 最安値をハイライト
+        var minPrice = Math.min(linePrice, Math.max(memberPrice, 0), lmPrice);
+        document.getElementById('preview-lm-price').style.fontWeight = lmPrice === minPrice ? '900' : 'bold';
+    } else {
+        lmRow.classList.add('hidden');
+    }
 }
 
 function renderTourPickupCheckboxes(selectedIds) {
@@ -1872,6 +1905,7 @@ function editTour(id) {
     document.getElementById('edit-tour-lm-amount-wrap').classList.toggle('hidden', !lmEnabled);
 
     renderTourPickupCheckboxes(t.pickupIds || []);
+    setTimeout(updatePricePreview, 50);
     openModal('modal-tour-editor');
 }
 

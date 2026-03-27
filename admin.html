@@ -444,8 +444,8 @@
                             <input type="number" id="edit-tour-capacity" class="w-full border p-2 rounded" required>
                         </div>
                         <div>
-                            <label class="block font-bold text-sm mb-1">料金</label>
-                            <input type="number" id="edit-tour-price" class="w-full border p-2 rounded" required>
+                            <label class="block font-bold text-sm mb-1">料金（LINE割引後・1人）</label>
+                            <input type="number" id="edit-tour-price" class="w-full border p-2 rounded" required oninput="updatePricePreview()">
                         </div>
                         <div>
                             <label class="block font-bold text-sm mb-1">ステータス</label>
@@ -466,8 +466,31 @@
                         </label>
                         <div id="edit-tour-lm-amount-wrap" class="hidden">
                             <label class="block font-bold text-sm mb-1">直前割引額（1人あたり）</label>
-                            <input type="number" id="edit-tour-lm-amount" class="w-full border p-2 rounded" min="0" value="0" placeholder="例: 500">
+                            <input type="number" id="edit-tour-lm-amount" class="w-full border p-2 rounded" min="0" value="0" placeholder="例: 500" oninput="updatePricePreview()">
                         </div>
+                    </div>
+                    <!-- 料金シミュレーション -->
+                    <div id="price-preview-box" class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm hidden">
+                        <p class="font-bold text-blue-900 mb-2">💰 料金シミュレーション（1人あたり）</p>
+                        <div class="space-y-1 text-gray-700">
+                            <div class="flex justify-between">
+                                <span>定価（非LINE申込）</span>
+                                <span id="preview-list-price" class="font-bold">—</span>
+                            </div>
+                            <div class="flex justify-between text-green-700">
+                                <span>LINE割引（-100円）</span>
+                                <span id="preview-line-price" class="font-bold">—</span>
+                            </div>
+                            <div class="flex justify-between text-blue-700">
+                                <span>特別会員（-300円）</span>
+                                <span id="preview-member-price" class="font-bold">—</span>
+                            </div>
+                            <div id="preview-lm-row" class="flex justify-between text-orange-700 hidden">
+                                <span id="preview-lm-label">直前割引（-0円）</span>
+                                <span id="preview-lm-price" class="font-bold">—</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">※ 有利な割引1つが自動適用されます</p>
                     </div>
                     <div>
                         <label class="block font-bold text-sm mb-1">説明文</label>
