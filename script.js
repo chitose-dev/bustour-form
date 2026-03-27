@@ -1840,17 +1840,16 @@ function toggleLastMinuteAmount() {
 }
 
 function updatePricePreview() {
-    var price = parseInt(document.getElementById('edit-tour-price').value) || 0;
+    var listPrice = parseInt(document.getElementById('edit-tour-price').value) || 0;
     var lmEnabled = document.getElementById('edit-tour-lm-enabled').checked;
     var lmAmount = parseInt(document.getElementById('edit-tour-lm-amount').value) || 0;
     var box = document.getElementById('price-preview-box');
 
-    if (!price) { box.classList.add('hidden'); return; }
+    if (!listPrice) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
 
-    var listPrice = price + 100;  // 定価 = LINE割引後 + 100
-    var linePrice = price;        // = listPrice - 100
-    var memberPrice = listPrice - 300;  // 特別会員 = 定価 - 300
+    var linePrice = Math.max(listPrice - 100, 0);   // LINE申込 = 定価 - 100
+    var memberPrice = Math.max(listPrice - 300, 0); // 特別会員 = 定価 - 300
 
     document.getElementById('preview-list-price').textContent = '¥' + listPrice.toLocaleString();
     document.getElementById('preview-line-price').textContent = '¥' + linePrice.toLocaleString();
@@ -1894,7 +1893,8 @@ function editTour(id) {
     document.getElementById('edit-tour-date').value = t.date;
     document.getElementById('edit-tour-deadline').value = t.deadline;
     document.getElementById('edit-tour-capacity').value = t.capacity;
-    document.getElementById('edit-tour-price').value = t.price;
+    // 定価（listPrice）を表示。なければ price + 100 で算出
+    document.getElementById('edit-tour-price').value = t.listPrice || (Number(t.price || 0) + 100);
     document.getElementById('edit-tour-status').value = t.status;
     document.getElementById('edit-tour-desc').value = t.description || '';
     document.getElementById('edit-tour-img').value = t.imageUrl || '';
@@ -1921,7 +1921,9 @@ async function _submitTourInner() {
     const date = document.getElementById('edit-tour-date').value;
     const deadline = document.getElementById('edit-tour-deadline').value;
     const capacity = parseInt(document.getElementById('edit-tour-capacity').value);
-    const price = parseInt(document.getElementById('edit-tour-price').value);
+    // 入力値は定価（listPrice）。price = listPrice - 100（LINE割引後）
+    const listPriceInput = parseInt(document.getElementById('edit-tour-price').value);
+    const price = Math.max(listPriceInput - 100, 0);
     const status = document.getElementById('edit-tour-status').value;
     const description = document.getElementById('edit-tour-desc').value;
     const imageUrl = document.getElementById('edit-tour-img').value;
@@ -1994,8 +1996,8 @@ async function _submitTourInner() {
                 date: date,
                 deadline_date: deadline,
                 capacity: capacity,
-                price: price,
-                listPrice: price + 100,
+                price: price,          // LINE割引後（定価-100）
+                listPrice: listPriceInput,  // 定価（入力値そのまま）
                 status: status,
                 description: description,
                 image_url: imageUrl,
