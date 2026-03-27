@@ -16,7 +16,9 @@ jobs:
       - name: Check for backend-admin changes
         id: check
         run: |
-          git diff --name-only HEAD~1 HEAD | grep -q "^backend-admin/" && echo "changed=true" >> $GITHUB_OUTPUT || echo "changed=false" >> $GITHUB_OUTPUT
+          # マージコミット対応: 親コミットを考慮して差分取得
+          BASE=$(git log --format=%P -n1 HEAD | awk '{print $1}')
+          git diff --name-only ${BASE} HEAD | grep -q "^backend-admin/" && echo "changed=true" >> $GITHUB_OUTPUT || echo "changed=false" >> $GITHUB_OUTPUT
 
       - name: Authenticate to Google Cloud
         if: steps.check.outputs.changed == 'true'
@@ -53,7 +55,8 @@ jobs:
       - name: Check for backend-booking changes
         id: check
         run: |
-          git diff --name-only HEAD~1 HEAD | grep -q "^backend-booking/" && echo "changed=true" >> $GITHUB_OUTPUT || echo "changed=false" >> $GITHUB_OUTPUT
+          BASE=$(git log --format=%P -n1 HEAD | awk '{print $1}')
+          git diff --name-only ${BASE} HEAD | grep -q "^backend-booking/" && echo "changed=true" >> $GITHUB_OUTPUT || echo "changed=false" >> $GITHUB_OUTPUT
 
       - name: Authenticate to Google Cloud
         if: steps.check.outputs.changed == 'true'
