@@ -2069,7 +2069,7 @@ async function saveTourMemoFromLedger() {
     if (!id) return;
     const memo = textarea.value;
     try {
-        const res = await fetch(API_BASE + '/tours/' + id, {
+        const res = await fetch(API_BASE_URL + '/tours/' + id, {
             method: 'PATCH',
             headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ memo: memo })
