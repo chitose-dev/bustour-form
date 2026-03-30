@@ -93,8 +93,13 @@ jobs:
       - name: Check for frontend changes
         id: check
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E "^(index\.html|admin\.html|script\.js|style\.css|firebase\.json|\.firebaserc)$" | wc -l)
-          echo "changed=$( [ $CHANGED -gt 0 ] && echo true || echo false )" >> $GITHUB_OUTPUT
+          BASE=$(git log --format=%P -n1 HEAD | awk '{print $1}')
+          if [ -z "$BASE" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED=$(git diff --name-only ${BASE} HEAD | grep -E "^(index\.html|admin\.html|script\.js|style\.css|firebase\.json|\.firebaserc)$" | wc -l)
+            echo "changed=$( [ $CHANGED -gt 0 ] && echo true || echo false )" >> $GITHUB_OUTPUT
+          fi
 
       - name: Deploy to Firebase Hosting
         if: steps.check.outputs.changed == 'true'
