@@ -147,11 +147,13 @@ def update_reservation_api(reservation_id):
         pickups = data.get('pickups')
         seat_pref = data.get('seatPref')
         total_price = data.get('totalPrice')
+        booking_source = data.get('bookingSource')
 
         if (
             new_status is None and progress_status is None and remark is None and special_member is None and manual_memo is None
             and progress_log is None
             and name is None and phone is None and address is None and passengers is None and pickup is None and pickups is None and seat_pref is None and total_price is None
+            and booking_source is None
         ):
             return jsonify({'error': 'at least one updatable field is required'}), 400
 
@@ -159,6 +161,7 @@ def update_reservation_api(reservation_id):
             new_status is not None or progress_status is not None or remark is not None or manual_memo is not None
             or progress_log is not None
             or name is not None or phone is not None or address is not None or passengers is not None or pickup is not None or pickups is not None or seat_pref is not None or total_price is not None
+            or booking_source is not None
         ):
             success = update_reservation_status(
                 reservation_id,
@@ -174,7 +177,8 @@ def update_reservation_api(reservation_id):
                 pickup=pickup,
                 pickups=pickups,
                 seat_pref=seat_pref,
-                total_price=total_price
+                total_price=total_price,
+                booking_source=booking_source
             )
             if not success:
                 return jsonify({'error': 'reservation not found'}), 404
