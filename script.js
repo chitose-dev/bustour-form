@@ -112,6 +112,7 @@ function normalizeReservation(reservation) {
         pickup: reservation.pickup || firstPickup,
         pickups: pickups,
         seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし'),
+        bookingSource: reservation.bookingSource || (reservation.lineUserId || reservation.line_user_id ? 'LINE公式' : 'Web直接'),
         createdAt: reservation.createdAt || '',
         progressLog: Array.isArray(reservation.progressLog)
             ? reservation.progressLog
@@ -988,6 +989,7 @@ function loadReservations() {
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.bookingSource || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">¥' + unitPrice.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
@@ -1154,7 +1156,6 @@ function showReservationDetail(id) {
         + '<div class="flex gap-2 text-sm">'
         + '<button type="button" id="detail-tab-btn-info" onclick="switchReservationDetailTab(\'info\')" class="px-3 py-2 font-bold border-b-2 border-primary">予約情報</button>'
         + '<button type="button" id="detail-tab-btn-memo" onclick="switchReservationDetailTab(\'memo\')" class="px-3 py-2 text-gray-600">顧客メモ</button>'
-        + '<button type="button" id="detail-tab-btn-state" onclick="switchReservationDetailTab(\'state\')" class="px-3 py-2 text-gray-600">状態管理</button>'
         + '</div>'
         + '</div>'
         + '<div id="detail-tab-info" class="space-y-3">'
@@ -1181,6 +1182,7 @@ function showReservationDetail(id) {
         + '<div id="edit-res-pickups-container"></div>'
         + '<p class="text-xs text-gray-500 mt-1">複数人で乗車地が異なる場合は行を分けて設定。1人で複数候補を持たせる場合も行追加で登録できます。</p>'
         + '</div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">予約方法</label><select id="edit-res-booking-source" class="w-full border p-2 rounded text-sm bg-white"><option value="LINE公式"' + (r.bookingSource === 'LINE公式' ? ' selected' : '') + '>LINE公式</option><option value="Web直接"' + (r.bookingSource === 'Web直接' ? ' selected' : '') + '>Web直接</option><option value="電話"' + (r.bookingSource === '電話' ? ' selected' : '') + '>電話</option></select></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onReservationEditInputsChanged(\'' + r.id + '\')"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">合計金額</label><div class="flex gap-2"><input type="number" id="edit-res-amount" class="w-full border p-2 rounded text-sm" min="0" value="' + r.amount + '"><button type="button" onclick="recalculateReservationAmount(\'' + r.id + '\')" class="px-3 py-2 rounded text-xs bg-gray-100 hover:bg-gray-200 border">自動計算</button></div><p id="edit-res-amount-hint" class="text-xs text-gray-500 mt-1"></p></div>'
         + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
@@ -1227,21 +1229,7 @@ function showReservationDetail(id) {
         + '<button onclick="saveManualMemo(\'' + r.id + '\');" class="mt-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded text-sm">手動メモを保存</button>'
         + '</div>'
         + '</div>'
-        + '<div id="detail-tab-state" class="space-y-3 hidden">'
-        + '<div class="p-3 border rounded bg-white">'
-        + '<label class="block text-sm font-bold mb-2">最新進捗ステータス</label>'
-        + '<select id="detail-progress-status-select" class="w-full border p-2 rounded text-sm mb-2">'
-        + '<option value="shipping"' + (activeProgress === 'shipping' ? ' selected' : '') + '>発送</option>'
-        + '<option value="middle"' + (activeProgress === 'middle' ? ' selected' : '') + '>中間</option>'
-        + '<option value="final"' + (activeProgress === 'final' ? ' selected' : '') + '>最終</option>'
-        + '<option value="need_check"' + (activeProgress === 'need_check' ? ' selected' : '') + '>要確認</option>'
-        + '</select>'
-        + '<button onclick="saveProgressStatusOnly(\'' + r.id + '\')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-sm">進捗ステータスを保存</button>'
-        + '</div>'
-        + '<div class="p-3 border rounded bg-gray-50">'
-        + '<p class="text-sm font-bold mb-2">進捗ログ履歴（新しい順）</p>'
-        + '<div>' + progressLogsHtml + '</div>'
-        + '</div>';
+        + '';
 
     openModal('modal-reservation-detail');
     initReservationPickupEditor(r);
@@ -1255,7 +1243,7 @@ function showReservationDetail(id) {
 }
 
 function switchReservationDetailTab(tabKey) {
-    var tabs = ['info', 'memo', 'state'];
+    var tabs = ['info', 'memo'];
     tabs.forEach(function(key) {
         var tabEl = document.getElementById('detail-tab-' + key);
         var btnEl = document.getElementById('detail-tab-btn-' + key);
@@ -1307,7 +1295,6 @@ async function saveProgressStatusOnly(id) {
         }
         await loadInitialData();
         showReservationDetail(id);
-        switchReservationDetailTab('state');
         alert('進捗ステータスを更新しました');
     } catch (err) {
         console.error(err);
@@ -1550,6 +1537,7 @@ async function saveReservationEdit(id) {
     var countInput = document.getElementById('edit-res-count');
     var seatInput = document.getElementById('edit-res-seat');
     var amountInput = document.getElementById('edit-res-amount');
+    var bookingSourceInput = document.getElementById('edit-res-booking-source');
 
     if (!nameInput || !countInput || !seatInput || !amountInput) {
         alert('編集フォームの読み込みに失敗しました。画面を開き直してください。');
@@ -1564,6 +1552,7 @@ async function saveReservationEdit(id) {
     var pickup = pickups.length > 0 ? pickups[0] : '';
     var seatPref = seatInput.value;
     var totalPrice = parseInt(amountInput.value, 10);
+    var bookingSource = bookingSourceInput ? bookingSourceInput.value : null;
 
     if (!name) {
         alert('氏名を入力してください');
@@ -1591,7 +1580,8 @@ async function saveReservationEdit(id) {
             pickup: pickup,
             pickups: pickups,
             seatPref: seatPref,
-            totalPrice: totalPrice
+            totalPrice: totalPrice,
+            bookingSource: bookingSource
         };
 
         var res = await fetch(`${API_BASE_URL}/reservations/${id}`, {

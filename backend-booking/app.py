@@ -638,7 +638,8 @@ def create_reservation():
                 'remark': str((user_info or {}).get('remark') or '').strip(),
                 'createdAt': now_jst_iso(),
                 'isManualEntry': False,
-                'isWaitlist': is_waitlist
+                'isWaitlist': is_waitlist,
+                'bookingSource': 'LINE公式' if line_user_id else 'Web直接'
             }
             
             res_ref = db.collection('reservations').document()
