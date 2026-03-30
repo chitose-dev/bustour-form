@@ -947,6 +947,8 @@ function loadReservations() {
         filtered.sort(function(a, b) {
             return formatPickupsDisplay(a).localeCompare(formatPickupsDisplay(b));
         });
+    } else if (sortKey === 'createdAtAsc') {
+        filtered.sort(function(a, b) { return (a.createdAt || '').localeCompare(b.createdAt || ''); });
     } else {
         filtered.sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
     }
@@ -978,7 +980,9 @@ function loadReservations() {
         const memoMark = r.manualMemo ? ' <span class="text-xs text-green-600" title="' + r.manualMemo.replace(/"/g, '&quot;').substring(0, 50) + '">📝</span>' : '';
         const unitPrice = tourObj ? (tourObj.listPrice || (tourObj.price + 100)) : (r.count > 0 ? Math.floor(r.amount / r.count) : 0);
 
-        tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
+        var createdAtDisplay = r.createdAt ? r.createdAt.substring(0, 10) : '-';
+        tr.innerHTML = '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + createdAtDisplay + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.date + '</td>'
             + '<td class="p-3 lg:p-4 border-b font-bold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]">' + tourName + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.name + memberMark + memoMark + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
