@@ -288,7 +288,7 @@ def set_special_member_for_reservation(reservation_id, enabled):
 
     return True, '', 1
 
-def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark='', special_member=False, member_discount_total=0):
+def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark='', special_member=False, member_discount_total=0, status='confirmed'):
     """手入力予約作成（LINE通知なし）"""
     reservation = {
         'lineUserId': None,
@@ -300,7 +300,7 @@ def create_manual_reservation(tour_id, date, tour_title, passengers, user_info, 
         'pickups': pickups,
         'preferredSeats': preferred_seats,
         'totalPrice': total_price,
-        'status': 'confirmed',
+        'status': status if status in ('confirmed', 'waitlist') else 'confirmed',
         'progressStatus': 'shipping',
         'remark': remark,
         'specialMember': bool(special_member),

@@ -226,33 +226,38 @@ def create_reservation_api():
         remark = data.get('remark', '')
         special_member = bool(data.get('special_member', False))
         member_discount_total = int(data.get('member_discount_total', 0) or 0)
-        
+        status = data.get('status', 'confirmed')
+        if status not in ('confirmed', 'waitlist'):
+            status = 'confirmed'
+
         # 入力値チェック
         if not all([tour_id, date, tour_title]):
             return jsonify({'error': 'tour_id, date, tour_title are required'}), 400
-        
-        # 定員チェック
+
+        # 定員チェック（キャンセル待ちは定員チェックをスキップ）
         tour_doc = get_tour(tour_id)
         if not tour_doc:
             return jsonify({'error': 'tour not found'}), 404
-        
-        capacity = tour_doc.get('capacity', 0)
-        # confirmed と pending 両方をカウント（pending漏れ修正）
-        confirmed_reservations = get_reservations_with_filters(status='confirmed')
-        pending_reservations = get_reservations_with_filters(status='pending')
-        current_count = sum(
-            r.get('passengers', 0)
-            for r in confirmed_reservations + pending_reservations
-            if r.get('tour_id') == tour_id and r.get('date') == date
-        )
-        
-        if current_count + passengers > capacity:
-            return jsonify({'error': 'capacity exceeded'}), 400
-        
+
+        if status != 'waitlist':
+            capacity = tour_doc.get('capacity', 0)
+            # confirmed と pending 両方をカウント（pending漏れ修正）
+            confirmed_reservations = get_reservations_with_filters(status='confirmed')
+            pending_reservations = get_reservations_with_filters(status='pending')
+            current_count = sum(
+                r.get('passengers', 0)
+                for r in confirmed_reservations + pending_reservations
+                if r.get('tour_id') == tour_id and r.get('date') == date
+            )
+
+            if current_count + passengers > capacity:
+                return jsonify({'error': 'capacity exceeded'}), 400
+
         # 手入力予約作成（LINE通知なし）
         reservation_id = create_manual_reservation(
             tour_id, date, tour_title, passengers, user_info, pickups, preferred_seats, total_price, remark,
-            special_member=special_member, member_discount_total=member_discount_total
+            special_member=special_member, member_discount_total=member_discount_total,
+            status=status
         )
         
         return jsonify({'id': reservation_id, 'message': 'Reservation created'}), 201
