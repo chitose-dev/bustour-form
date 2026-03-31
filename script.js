@@ -88,7 +88,14 @@ function normalizePickup(pickup) {
 
 function normalizeReservation(reservation) {
     const userInfo = reservation.userInfo || {};
-    const pickups = Array.isArray(reservation.pickups) ? reservation.pickups : [];
+    const rawPickups = Array.isArray(reservation.pickups) ? reservation.pickups : [];
+    // pickupsはオブジェクト形式({id, name})でも文字列でも正規化して文字列配列にする
+    const pickups = rawPickups.map(function(p) {
+        if (!p) return '';
+        if (typeof p === 'string') return p;
+        if (typeof p === 'object') return p.name || p.id || '';
+        return String(p);
+    }).filter(Boolean);
     const preferredSeats = Array.isArray(reservation.preferredSeats) ? reservation.preferredSeats : [];
     const firstPickup = pickups.length > 0 ? pickups[0] : '';
     const hasPreferredSeat = preferredSeats.some(Boolean);
@@ -290,10 +297,14 @@ function savePreferredProgressMethod(reservation, method) {
 
 function resolvePickupName(idOrName) {
     if (!idOrName) return null;
-    // cachedPickupsのIDと照合
-    var found = cachedPickups.find(function(p) { return p.id === idOrName; });
-    if (found) return found.name || found.displayName || idOrName;
-    return idOrName; // IDでなければそのまま
+    // オブジェクト形式（{id, name}）のpickupを正規化
+    var key = (typeof idOrName === 'object') ? (idOrName.id || idOrName.name || '') : String(idOrName);
+    if (!key) return null;
+    // IDで照合、次に名前で照合
+    var found = cachedPickups.find(function(p) { return p.id === key || p.name === key; });
+    if (found) return found.name || key;
+    // オブジェクトなら名前フィールドを返す、なければkeyをそのまま返す
+    return (typeof idOrName === 'object') ? (idOrName.name || key) : key;
 }
 
 function formatPickupsDisplay(r) {
@@ -729,6 +740,8 @@ function resetManualReservationForm() {
     if (summary) summary.innerHTML = '';
     var discountRow = document.getElementById('manual-breakdown-discount-row');
     if (discountRow) discountRow.classList.add('hidden');
+    var statusSelect = document.getElementById('manual-status');
+    if (statusSelect) statusSelect.value = 'confirmed';
 }
 
 function getManualReservationDraft() {
@@ -740,6 +753,8 @@ function getManualReservationDraft() {
     var pickups = Array.from(document.querySelectorAll('.manual-pickup-cb:checked')).map(function(cb) { return cb.value; });
     var seatPref = document.getElementById('manual-seat-pref').value;
     var specialMember = !!document.getElementById('manual-special-member').checked;
+    var statusEl = document.getElementById('manual-status');
+    var status = statusEl ? statusEl.value : 'confirmed';
     var tour = cachedTours.find(function(item) { return item.id === tourId; });
 
     return {
@@ -751,7 +766,8 @@ function getManualReservationDraft() {
         count: count,
         pickups: pickups,
         seatPref: seatPref,
-        specialMember: specialMember
+        specialMember: specialMember,
+        status: status
     };
 }
 
@@ -820,7 +836,8 @@ function showManualReservationPreview() {
         + '<div class="flex justify-between gap-4"><span class="text-gray-500">人数</span><span class="font-bold text-right">' + draft.count + '名</span></div>'
         + '<div class="flex justify-between gap-4"><span class="text-gray-500">乗車地</span><span class="font-bold text-right">' + draft.pickups.join(' / ') + '</span></div>'
         + '<div class="flex justify-between gap-4"><span class="text-gray-500">前列座席指定</span><span class="font-bold text-right">' + draft.seatPref + '</span></div>'
-        + '<div class="flex justify-between gap-4"><span class="text-gray-500">特別会員</span><span class="font-bold text-right">' + (draft.specialMember ? '適用' : 'なし') + '</span></div>';
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">特別会員</span><span class="font-bold text-right">' + (draft.specialMember ? '適用' : 'なし') + '</span></div>'
+        + '<div class="flex justify-between gap-4"><span class="text-gray-500">予約ステータス</span><span class="font-bold text-right ' + (draft.status === 'waitlist' ? 'text-orange-600' : 'text-green-600') + '">' + (draft.status === 'waitlist' ? 'キャンセル待ち' : 'ご予約確定') + '</span></div>';
 
     document.getElementById('manual-breakdown-base-unit').innerText = '¥' + pricing.baseUnitPrice.toLocaleString();
     document.getElementById('manual-breakdown-base-total').innerText = '¥' + pricing.baseTotal.toLocaleString();
@@ -1730,7 +1747,7 @@ async function submitManualReservation() {
         address: draft.address,
         count: draft.count,
         amount: price,
-        status: 'confirmed',
+        status: draft.status || 'confirmed',
         progressStatus: 'shipping',
         pickup: draft.pickups.join(', '),
         seat_pref: draft.seatPref,
@@ -1769,7 +1786,8 @@ async function submitManualReservation() {
                 preferred_seats: preferredSeats,
                 total_price: price,
                 special_member: draft.specialMember,
-                member_discount_total: pricing.discount
+                member_discount_total: pricing.discount,
+                status: draft.status || 'confirmed'
             };
 
             const res = await fetch(`${API_BASE_URL}/reservations`, {
