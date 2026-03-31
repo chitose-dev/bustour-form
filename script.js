@@ -112,7 +112,7 @@ function normalizeReservation(reservation) {
         pickup: reservation.pickup || firstPickup,
         pickups: pickups,
         seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし'),
-        bookingSource: reservation.bookingSource || (reservation.lineUserId || reservation.line_user_id ? 'LINE公式' : 'Web直接'),
+        bookingSource: reservation.bookingSource || (reservation.lineUserId || reservation.line_user_id ? '公式LINE（システム）' : 'WEB直接'),
         createdAt: reservation.createdAt || '',
         progressLog: Array.isArray(reservation.progressLog)
             ? reservation.progressLog
@@ -129,6 +129,7 @@ function getStatusMeta(statusKey) {
 }
 
 function getProgressMeta(progressKey) {
+    if (progressKey === 'reception') return { label: '受付', className: 'text-green-600 bg-green-50' };
     if (progressKey === 'middle') return { label: '中間', className: 'text-blue-600 bg-blue-50' };
     if (progressKey === 'final') return { label: '最終', className: 'text-purple-600 bg-purple-50' };
     if (progressKey === 'need_check') return { label: '要確認', className: 'text-red-600 bg-red-50' };
@@ -874,13 +875,15 @@ function downloadCSV() {
     const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '人数', '乗車地', '前列座席', '単価', '金額', 'ステータス', '進捗', 'メモ'];
     const rows = filtered.map(function(r) {
         const statusLabel = r.status === 'cancelled' ? 'キャンセル' : r.status === 'waitlist' ? 'キャンセル待ち' : r.status === 'pending' ? '予約申込中' : 'ご予約確定';
-        const progressLabel = r.progressStatus === 'middle'
-            ? '中間'
-            : r.progressStatus === 'final'
-                ? '最終'
-                : r.progressStatus === 'need_check'
-                    ? '要確認'
-                    : '発送';
+        const progressLabel = r.progressStatus === 'reception'
+            ? '受付'
+            : r.progressStatus === 'middle'
+                ? '中間'
+                : r.progressStatus === 'final'
+                    ? '最終'
+                    : r.progressStatus === 'need_check'
+                        ? '要確認'
+                        : '発送';
         const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
         const tourName = tourObj ? tourObj.title : r.tour_name;
         return [
@@ -962,7 +965,16 @@ function loadReservations() {
             totalSales += r.amount;
         }
     });
-    document.getElementById('summary-people').innerText = totalPeople + '名';
+    // 定員計算（15/20 表記）
+    var totalCapacity = 0;
+    if (filterTourId) {
+        var selectedTour = cachedTours.find(function(t) { return t.id === filterTourId; });
+        totalCapacity = selectedTour ? (selectedTour.capacity || 0) : 0;
+    } else {
+        cachedTours.forEach(function(t) { totalCapacity += (t.capacity || 0); });
+    }
+    var peopleText = totalCapacity > 0 ? totalPeople + '/' + totalCapacity + '名' : totalPeople + '名';
+    document.getElementById('summary-people').innerText = peopleText;
     document.getElementById('summary-sales').innerText = '¥' + totalSales.toLocaleString();
 
     const tbody = document.getElementById('reservations-table-body');
@@ -1015,12 +1027,12 @@ function loadReservations() {
     const rows = table.querySelectorAll('tbody tr');
     
     if (filterTourId) {
-        // ツアー選択時は最初の 2 列（ツアー日、ツアー名）を非表示
-        headers[0].style.display = 'none';
+        // ツアー選択時はツアー日(index1)・ツアー名(index2)列を非表示（申し込み日は表示したまま）
         headers[1].style.display = 'none';
+        headers[2].style.display = 'none';
         rows.forEach(function(row) {
-            row.cells[0].style.display = 'none';
-            row.cells[1].style.display = 'none';
+            if (row.cells[1]) row.cells[1].style.display = 'none';
+            if (row.cells[2]) row.cells[2].style.display = 'none';
         });
         // ツアーメモエリアを表示
         var memoArea = document.getElementById('tour-memo-area');
@@ -1033,11 +1045,11 @@ function loadReservations() {
         }
     } else {
         // ツアー未選択時は表示
-        headers[0].style.display = '';
         headers[1].style.display = '';
+        headers[2].style.display = '';
         rows.forEach(function(row) {
-            row.cells[0].style.display = '';
-            row.cells[1].style.display = '';
+            if (row.cells[1]) row.cells[1].style.display = '';
+            if (row.cells[2]) row.cells[2].style.display = '';
         });
         // ツアーメモエリアを非表示
         var memoArea = document.getElementById('tour-memo-area');
@@ -1182,7 +1194,7 @@ function showReservationDetail(id) {
         + '<div id="edit-res-pickups-container"></div>'
         + '<p class="text-xs text-gray-500 mt-1">複数人で乗車地が異なる場合は行を分けて設定。1人で複数候補を持たせる場合も行追加で登録できます。</p>'
         + '</div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">予約方法</label><select id="edit-res-booking-source" class="w-full border p-2 rounded text-sm bg-white"><option value="LINE公式"' + (r.bookingSource === 'LINE公式' ? ' selected' : '') + '>LINE公式</option><option value="Web直接"' + (r.bookingSource === 'Web直接' ? ' selected' : '') + '>Web直接</option><option value="電話"' + (r.bookingSource === '電話' ? ' selected' : '') + '>電話</option></select></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">予約方法</label><select id="edit-res-booking-source" class="w-full border p-2 rounded text-sm bg-white"><option value="公式LINE（システム）"' + (r.bookingSource === '公式LINE（システム）' ? ' selected' : '') + '>公式LINE（システム）</option><option value="公式LINE（メッセージ）"' + (r.bookingSource === '公式LINE（メッセージ）' ? ' selected' : '') + '>公式LINE（メッセージ）</option><option value="個人LINE"' + (r.bookingSource === '個人LINE' ? ' selected' : '') + '>個人LINE</option><option value="電話"' + (r.bookingSource === '電話' ? ' selected' : '') + '>電話</option><option value="WEB直接"' + (r.bookingSource === 'WEB直接' || r.bookingSource === 'Web直接' ? ' selected' : '') + '>WEB直接</option><option value="その他"' + (r.bookingSource === 'その他' ? ' selected' : '') + '>その他</option></select></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onReservationEditInputsChanged(\'' + r.id + '\')"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">合計金額</label><div class="flex gap-2"><input type="number" id="edit-res-amount" class="w-full border p-2 rounded text-sm" min="0" value="' + r.amount + '"><button type="button" onclick="recalculateReservationAmount(\'' + r.id + '\')" class="px-3 py-2 rounded text-xs bg-gray-100 hover:bg-gray-200 border">自動計算</button></div><p id="edit-res-amount-hint" class="text-xs text-gray-500 mt-1"></p></div>'
         + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
