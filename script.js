@@ -1214,6 +1214,7 @@ function showReservationDetail(id) {
         + '<div><label class="block text-gray-600 text-sm mb-1">予約方法</label><select id="edit-res-booking-source" class="w-full border p-2 rounded text-sm bg-white"><option value="公式LINE（システム）"' + (r.bookingSource === '公式LINE（システム）' ? ' selected' : '') + '>公式LINE（システム）</option><option value="公式LINE（メッセージ）"' + (r.bookingSource === '公式LINE（メッセージ）' ? ' selected' : '') + '>公式LINE（メッセージ）</option><option value="個人LINE"' + (r.bookingSource === '個人LINE' ? ' selected' : '') + '>個人LINE</option><option value="電話"' + (r.bookingSource === '電話' ? ' selected' : '') + '>電話</option><option value="WEB直接"' + (r.bookingSource === 'WEB直接' || r.bookingSource === 'Web直接' ? ' selected' : '') + '>WEB直接</option><option value="その他"' + (r.bookingSource === 'その他' ? ' selected' : '') + '>その他</option></select></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onReservationEditInputsChanged(\'' + r.id + '\')"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">合計金額</label><div class="flex gap-2"><input type="number" id="edit-res-amount" class="w-full border p-2 rounded text-sm" min="0" value="' + r.amount + '"><button type="button" onclick="recalculateReservationAmount(\'' + r.id + '\')" class="px-3 py-2 rounded text-xs bg-gray-100 hover:bg-gray-200 border">自動計算</button></div><p id="edit-res-amount-hint" class="text-xs text-gray-500 mt-1"></p></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">メモ</label><textarea id="edit-res-manual-memo" class="w-full border p-2 rounded text-sm resize-none" rows="3" placeholder="この予約のメモ">' + (r.manualMemo || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') + '</textarea></div>'
         + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
         + '<hr>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">特別会員</span><span class="font-bold text-sm">' + (r.specialMember ? '適用中' : '未適用') + '</span></div>'
@@ -1567,6 +1568,7 @@ async function saveReservationEdit(id) {
     var seatInput = document.getElementById('edit-res-seat');
     var amountInput = document.getElementById('edit-res-amount');
     var bookingSourceInput = document.getElementById('edit-res-booking-source');
+    var manualMemoInput = document.getElementById('edit-res-manual-memo');
 
     if (!nameInput || !countInput || !seatInput || !amountInput) {
         alert('編集フォームの読み込みに失敗しました。画面を開き直してください。');
@@ -1582,6 +1584,7 @@ async function saveReservationEdit(id) {
     var seatPref = seatInput.value;
     var totalPrice = parseInt(amountInput.value, 10);
     var bookingSource = bookingSourceInput ? bookingSourceInput.value : null;
+    var manualMemo = manualMemoInput ? manualMemoInput.value : null;
 
     if (!name) {
         alert('氏名を入力してください');
@@ -1610,7 +1613,8 @@ async function saveReservationEdit(id) {
             pickups: pickups,
             seatPref: seatPref,
             totalPrice: totalPrice,
-            bookingSource: bookingSource
+            bookingSource: bookingSource,
+            manualMemo: manualMemo
         };
 
         var res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
