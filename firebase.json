@@ -17,6 +17,10 @@
         "destination": "/admin.html"
       },
       {
+        "source": "/pickup",
+        "destination": "/pickup.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

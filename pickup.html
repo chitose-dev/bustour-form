@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>乗車地一覧 | ひばりバスツアー</title>
+    <link rel="icon" href="data:,">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FACC15',
+                        'primary-hover': '#EAB308',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #f9fafb; }
+        .pickup-card {
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .pickup-card:active {
+            transform: scale(0.97);
+        }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+
+    <!-- ヘッダー -->
+    <header class="bg-gray-900 text-white px-4 py-4 flex items-center gap-3 sticky top-0 z-10 shadow-lg">
+        <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-900" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 6v12M4 9h16M4 15h16M16 6v12M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+            </svg>
+        </div>
+        <div>
+            <h1 class="text-base font-bold leading-tight">乗車地一覧</h1>
+            <p class="text-xs text-gray-400">ひばりバスツアー</p>
+        </div>
+    </header>
+
+    <!-- 説明文 -->
+    <div class="px-4 pt-5 pb-2 max-w-xl mx-auto">
+        <p class="text-sm text-gray-600 leading-relaxed">
+            ご乗車いただける停留所の一覧です。<br>
+            地図アイコンをタップすると現地のマップが開きます。
+        </p>
+    </div>
+
+    <!-- 乗車地リスト -->
+    <main class="px-4 pb-10 max-w-xl mx-auto space-y-3 mt-2">
+
+        <a href="https://maps.app.goo.gl/dQzcqNdEwaXn3vdLA" target="_blank" rel="noopener" class="pickup-card flex items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 block hover:shadow-md">
+            <div class="w-11 h-11 bg-yellow-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-xl">🚌</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-base">ひばり車庫</p>
+                <p class="text-xs text-gray-400 mt-0.5">タップして地図を開く</p>
+            </div>
+            <div class="text-primary flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+        </a>
+
+        <a href="https://maps.app.goo.gl/h1WU3LgTRksUmkoHA" target="_blank" rel="noopener" class="pickup-card flex items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 block hover:shadow-md">
+            <div class="w-11 h-11 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-xl">🚉</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-base">河毛駅東口</p>
+                <p class="text-xs text-gray-400 mt-0.5">タップして地図を開く</p>
+            </div>
+            <div class="text-primary flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+        </a>
+
+        <a href="https://maps.app.goo.gl/UxnyPE1tzXHueKJu6" target="_blank" rel="noopener" class="pickup-card flex items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 block hover:shadow-md">
+            <div class="w-11 h-11 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-xl">🚉</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-base">木之本駅西口</p>
+                <p class="text-xs text-gray-400 mt-0.5">タップして地図を開く</p>
+            </div>
+            <div class="text-primary flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+        </a>
+
+        <a href="https://maps.app.goo.gl/rXZ5mexA2KpTmGSv9" target="_blank" rel="noopener" class="pickup-card flex items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 block hover:shadow-md">
+            <div class="w-11 h-11 bg-green-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-xl">🏢</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-base">浅井支所</p>
+                <p class="text-xs text-gray-400 mt-0.5">タップして地図を開く</p>
+            </div>
+            <div class="text-primary flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+        </a>
+
+        <a href="https://maps.app.goo.gl/K7e2QhMKHqA7gKbs8" target="_blank" rel="noopener" class="pickup-card flex items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 block hover:shadow-md">
+            <div class="w-11 h-11 bg-orange-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-xl">🛒</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-base">イオン長浜店</p>
+                <p class="text-xs text-gray-400 mt-0.5">タップして地図を開く</p>
+            </div>
+            <div class="text-primary flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+        </a>
+
+        <a href="https://maps.app.goo.gl/uoBqe2rScQQaWTEi6" target="_blank" rel="noopener" class="pickup-card flex items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 block hover:shadow-md">
+            <div class="w-11 h-11 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-xl">🚉</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-base">米原駅東口</p>
+                <p class="text-xs text-gray-400 mt-0.5">タップして地図を開く</p>
+            </div>
+            <div class="text-primary flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+        </a>
+
+        <a href="https://maps.app.goo.gl/w6vTXR5zFrdmTRZb8" target="_blank" rel="noopener" class="pickup-card flex items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 block hover:shadow-md">
+            <div class="w-11 h-11 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-xl">🚉</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-base">彦根駅東口</p>
+                <p class="text-xs text-gray-400 mt-0.5">タップして地図を開く</p>
+            </div>
+            <div class="text-primary flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+        </a>
+
+        <a href="https://maps.app.goo.gl/xFA6svu4mytp4gAC8" target="_blank" rel="noopener" class="pickup-card flex items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 block hover:shadow-md">
+            <div class="w-11 h-11 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <span class="text-xl">🚉</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-gray-900 text-base">坂田駅東口</p>
+                <p class="text-xs text-gray-400 mt-0.5">タップして地図を開く</p>
+            </div>
+            <div class="text-primary flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+        </a>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="text-center text-xs text-gray-400 pb-8">
+        ひばりバスツアー
+    </footer>
+
+</body>
+</html>
