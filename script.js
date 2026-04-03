@@ -889,8 +889,9 @@ function downloadCSV() {
         return matchTour && matchDate && matchStatus;
     });
 
-    const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '人数', '乗車地', '前列座席', '単価', '金額', 'ステータス', '進捗', 'メモ'];
-    const rows = filtered.map(function(r) {
+    const headers = ['ツアー日', 'ツアー名', '氏名', '電話番号', '住所', '乗車地', '前列座席', '単価', '金額', 'ステータス', '進捗', 'メモ'];
+    const rows = [];
+    filtered.forEach(function(r) {
         const statusLabel = r.status === 'cancelled' ? 'キャンセル' : r.status === 'waitlist' ? 'キャンセル待ち' : r.status === 'pending' ? '予約申込中' : 'ご予約確定';
         const progressLabel = r.progressStatus === 'reception'
             ? '受付'
@@ -903,21 +904,27 @@ function downloadCSV() {
                         : '発送';
         const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
         const tourName = tourObj ? tourObj.title : r.tour_name;
-        return [
-            r.date,
-            tourName,
-            r.name,
-            r.phone || '',
-            r.address || '',
-            r.count,
-            formatPickupsDisplay(r),
-            r.seat_pref || 'なし',
-            r.count > 0 ? Math.floor(r.amount / r.count) : 0,
-            r.amount,
-            statusLabel,
-            progressLabel,
-            r.manualMemo || ''
-        ];
+        const unitPrice = r.count > 0 ? Math.floor(r.amount / r.count) : 0;
+        // 希望12: 人数分の行に展開
+        var pickupsList = Array.isArray(r.pickups) ? r.pickups : [];
+        var count = Math.max(r.count, 1);
+        for (var i = 0; i < count; i++) {
+            var pickupName = pickupsList[i] ? resolvePickupName(pickupsList[i]) : (pickupsList[0] ? resolvePickupName(pickupsList[0]) : formatPickupsDisplay(r));
+            rows.push([
+                r.date,
+                tourName,
+                r.name,
+                r.phone || '',
+                r.address || '',
+                pickupName,
+                r.seat_pref || 'なし',
+                unitPrice,
+                i === 0 ? r.amount : '',
+                i === 0 ? statusLabel : '',
+                i === 0 ? progressLabel : '',
+                i === 0 ? (r.manualMemo || '') : ''
+            ]);
+        }
     });
 
     const csvContent = '\uFEFF' + [headers].concat(rows).map(function(row) {
@@ -1216,6 +1223,7 @@ function showReservationDetail(id) {
         + '<div><label class="block text-gray-600 text-sm mb-1">合計金額</label><div class="flex gap-2"><input type="number" id="edit-res-amount" class="w-full border p-2 rounded text-sm" min="0" value="' + r.amount + '"><button type="button" onclick="recalculateReservationAmount(\'' + r.id + '\')" class="px-3 py-2 rounded text-xs bg-gray-100 hover:bg-gray-200 border">自動計算</button></div><p id="edit-res-amount-hint" class="text-xs text-gray-500 mt-1"></p></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">メモ</label><textarea id="edit-res-manual-memo" class="w-full border p-2 rounded text-sm resize-none" rows="3" placeholder="この予約のメモ">' + (r.manualMemo || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') + '</textarea></div>'
         + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
+        + '<button onclick="copyBasicInfo(\'' + r.id + '\');" class="mt-2 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 rounded text-sm border">基本情報をコピー</button>'
         + '<hr>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">特別会員</span><span class="font-bold text-sm">' + (r.specialMember ? '適用中' : '未適用') + '</span></div>'
         + '<div class="flex justify-between"><span class="text-gray-600 text-sm">会員割引</span><span class="font-bold text-sm">-¥' + (r.memberDiscountTotal || 0).toLocaleString() + '</span></div>'
@@ -1558,6 +1566,28 @@ function onReservationEditInputsChanged(id) {
 
 function recalculateReservationAmount(id) {
     syncReservationAmountByInputs(id, true);
+}
+
+function copyBasicInfo(id) {
+    var r = getReservationById(id);
+    if (!r) return;
+    var text = '氏名: ' + r.name + '\n'
+        + '電話番号: ' + (r.phone || '-') + '\n'
+        + '住所: ' + (r.address || '-') + '\n'
+        + '乗車地: ' + formatPickupsDisplay(r) + '\n'
+        + '人数: ' + r.count + '名';
+    navigator.clipboard.writeText(text).then(function() {
+        alert('基本情報をコピーしました');
+    }).catch(function() {
+        // フォールバック
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('基本情報をコピーしました');
+    });
 }
 
 async function saveReservationEdit(id) {
