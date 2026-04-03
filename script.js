@@ -120,6 +120,7 @@ function normalizeReservation(reservation) {
         pickups: pickups,
         seat_pref: reservation.seat_pref || (hasPreferredSeat ? 'あり' : 'なし'),
         bookingSource: reservation.bookingSource || (reservation.lineUserId || reservation.line_user_id ? '公式LINE（システム）' : 'WEB直接'),
+        manualMemo: reservation.manualMemo || '',
         createdAt: reservation.createdAt || '',
         progressLog: Array.isArray(reservation.progressLog)
             ? reservation.progressLog
@@ -692,6 +693,11 @@ function openModal(modalId) {
             opt.innerText = t.date + ' : ' + t.title + ' (残' + (t.capacity - (t.current || 0)) + ')';
             select.appendChild(opt);
         });
+        // 希望7: フィルター中のツアーを自動選択
+        var currentFilterTour = document.getElementById('filter-tour-name') ? document.getElementById('filter-tour-name').value : '';
+        if (currentFilterTour) {
+            select.value = currentFilterTour;
+        }
         var pickupContainer = document.getElementById('manual-pickup-checkboxes');
         pickupContainer.innerHTML = '';
         cachedPickups.filter(function(p) { return p.active; }).sort(function(a, b) { return a.sortOrder - b.sortOrder; }).forEach(function(p) {
@@ -992,7 +998,17 @@ function loadReservations() {
     }
     var peopleText = totalCapacity > 0 ? totalPeople + '/' + totalCapacity + '名' : totalPeople + '名';
     document.getElementById('summary-people').innerText = peopleText;
-    document.getElementById('summary-sales').innerText = '¥' + totalSales.toLocaleString();
+    // 希望11: ツアー選択時は定価表示、全ツアー時は売上合計
+    var salesLabel = document.getElementById('summary-sales-label');
+    if (filterTourId) {
+        var selectedTourForPrice = cachedTours.find(function(t) { return t.id === filterTourId; });
+        var listPrice = selectedTourForPrice ? (selectedTourForPrice.listPrice || (selectedTourForPrice.price + 100)) : 0;
+        if (salesLabel) salesLabel.innerText = 'ツアー定価';
+        document.getElementById('summary-sales').innerText = '¥' + listPrice.toLocaleString();
+    } else {
+        if (salesLabel) salesLabel.innerText = '売上合計金額';
+        document.getElementById('summary-sales').innerText = '¥' + totalSales.toLocaleString();
+    }
 
     const tbody = document.getElementById('reservations-table-body');
     tbody.innerHTML = '';
@@ -1018,9 +1034,9 @@ function loadReservations() {
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">' + (r.lineDisplayName || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + r.count + '名</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + formatPickupsDisplay(r) + '</td>'
+            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap max-w-[150px] overflow-hidden text-ellipsis" title="' + (r.manualMemo || '').replace(/"/g, '&quot;') + '">' + (r.manualMemo ? r.manualMemo.substring(0, 20) + (r.manualMemo.length > 20 ? '…' : '') : '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.bookingSource || '-') + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">' + (r.seat_pref || '-') + '</td>'
-            + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap text-gray-500">¥' + unitPrice.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b text-sm whitespace-nowrap">¥' + r.amount.toLocaleString() + '</td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap"><span class="px-2 py-1 rounded text-xs font-bold ' + statusMeta.className + '">' + statusMeta.label + '</span></td>'
             + '<td class="p-3 lg:p-4 border-b whitespace-nowrap">'
