@@ -981,9 +981,8 @@ function loadReservations() {
         filtered.sort(function(a, b) {
             return formatPickupsDisplay(a).localeCompare(formatPickupsDisplay(b));
         });
-    } else if (sortKey === 'createdAtAsc') {
-        filtered.sort(function(a, b) { return (a.createdAt || '').localeCompare(b.createdAt || ''); });
     } else {
+        // createdAt: 申込日順（新しい順） — デフォルト
         filtered.sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
     }
 
