@@ -16,6 +16,14 @@ NOTIFICATION_DEDUP_SECONDS = float(os.getenv('NOTIFICATION_DEDUP_SECONDS', '5'))
 
 RESERVATION_TRIGGER_MESSAGE = '予約確認画面を表示しています...しばらくお待ちください。'
 
+# LIFFから自動送信される予約通知メッセージのプレフィクス
+# このプレフィクスで始まるメッセージは webhook で trigger 扱いせず無視する
+# (将来 webhook に汎用 auto-reply を追加した時に誤発火しないよう防御)
+RESERVATION_AUTO_NOTIFY_PREFIXES = (
+    '🚌 予約申込:',
+    '⏳ キャンセル待ち:',
+)
+
 recent_notifications = {}
 
 
@@ -247,6 +255,10 @@ def handle_webhook_event(event):
     user_id = event.get('source', {}).get('userId')
 
     if not reply_token or not user_id:
+        return
+
+    # LIFFから自動送信される予約通知は trigger 扱いしない (誤発火防止)
+    if text.startswith(RESERVATION_AUTO_NOTIFY_PREFIXES):
         return
 
     if text == RESERVATION_TRIGGER_MESSAGE:
