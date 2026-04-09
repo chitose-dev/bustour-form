@@ -44,7 +44,7 @@ jobs:
             --allow-unauthenticated \
             --memory 512Mi \
             --timeout 540s \
-            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }},ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }},LINE_CHANNEL_TOKEN=${{ secrets.ADMIN_LINE_CHANNEL_TOKEN }},LINE_CHANNEL_SECRET=${{ secrets.ADMIN_LINE_CHANNEL_SECRET }},IMGUR_CLIENT_ID=${{ secrets.IMGUR_CLIENT_ID }}"
+            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }},ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }},LINE_CHANNEL_TOKEN=${{ secrets.ADMIN_LINE_CHANNEL_TOKEN }},LINE_CHANNEL_SECRET=${{ secrets.ADMIN_LINE_CHANNEL_SECRET }},IMGUR_CLIENT_ID=${{ secrets.IMGUR_CLIENT_ID }},FIREBASE_SA_KEY_B64=${{ secrets.FIREBASE_SA_KEY_B64 }}"
           echo "✅ backend-admin-v2 デプロイ完了"
 
   # ── backend-booking の変更チェック & デプロイ ──────────────────
@@ -84,7 +84,7 @@ jobs:
             --allow-unauthenticated \
             --memory 512Mi \
             --timeout 540s \
-            --set-env-vars "LINE_CHANNEL_TOKEN=${{ secrets.BOOKING_LINE_CHANNEL_TOKEN }},LINE_CHANNEL_SECRET=${{ secrets.BOOKING_LINE_CHANNEL_SECRET }}"
+            --set-env-vars "LINE_CHANNEL_TOKEN=${{ secrets.BOOKING_LINE_CHANNEL_TOKEN }},LINE_CHANNEL_SECRET=${{ secrets.BOOKING_LINE_CHANNEL_SECRET }},FIREBASE_SA_KEY_B64=${{ secrets.FIREBASE_SA_KEY_B64 }}"
           echo "✅ backend-booking-v2 デプロイ完了"
 
   # ── Firebase Hosting（フロントエンド）デプロイ ──────────────────

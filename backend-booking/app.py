@@ -17,7 +17,8 @@ app = Flask(__name__)
 CORS(app)
 
 # Firebase/Firestore初期化
-# FIREBASE_SA_KEY_B64 環境変数があればそのSAキーを使用
+# FIREBASE_SA_KEY_B64 環境変数があればそのSAキーを使用 (bustourreservation プロジェクト接続)
+# 注: 本ファイルの変更検知をトリガーして deploy.yml の FIREBASE_SA_KEY_B64 修正を本番反映させる
 _sa_key_b64 = os.environ.get('FIREBASE_SA_KEY_B64')
 if _sa_key_b64:
     _sa_info = json.loads(base64.b64decode(_sa_key_b64).decode())

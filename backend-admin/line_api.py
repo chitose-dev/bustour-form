@@ -16,6 +16,7 @@ NOTIFICATION_DEDUP_SECONDS = float(os.getenv('NOTIFICATION_DEDUP_SECONDS', '5'))
 
 RESERVATION_TRIGGER_MESSAGE = '予約確認画面を表示しています...しばらくお待ちください。'
 
+# 注: 本ファイルの変更検知をトリガーして deploy.yml の FIREBASE_SA_KEY_B64 修正を本番反映させる
 # LIFFから自動送信される予約通知メッセージのプレフィクス
 # このプレフィクスで始まるメッセージは webhook で trigger 扱いせず無視する
 # (将来 webhook に汎用 auto-reply を追加した時に誤発火しないよう防御)
