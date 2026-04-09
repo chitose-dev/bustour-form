@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # マージコミット親の diff を取るため full history が必要
 
       - name: Check for backend-admin changes
         id: check
@@ -51,6 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # マージコミット親の diff を取るため full history が必要
 
       - name: Check for backend-booking changes
         id: check
@@ -89,6 +93,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # マージコミット親の diff を取るため full history が必要
 
       - name: Check for frontend changes
         id: check
