@@ -1156,6 +1156,56 @@
             return null;
         }
 
+        // スタッフがLINE公式アカウントマネージャーで新規予約に気付けるよう、
+        // 予約完了直後に お客さん本人として bot に通知メッセージを送信する。
+        // bot 側には incoming user message として記録されるため、チャット一覧の上位に bump される。
+        // chat_message.write スコープが必要。スコープ未付与・SDK不対応・送信失敗時は黙ってスキップ（best-effort）。
+        async function notifyStaffViaLiff(data) {
+            // 二重送信ガード
+            if (cache.notifySent) return;
+
+            if (typeof liff === 'undefined' || !liff.isInClient || !liff.isInClient()) {
+                return; // 外部ブラウザでは sendMessages が動かない
+            }
+
+            // chat_message.write スコープが付与されているか事前確認
+            // 既存ログイン済みユーザーは新スコープに未同意のため granted にならない → スキップ
+            try {
+                if (liff.permission && typeof liff.permission.query === 'function') {
+                    const status = await liff.permission.query('chat_message.write');
+                    if (status && status.state !== 'granted') {
+                        console.warn('chat_message.write not granted, skipping LIFF notify. state=', status.state);
+                        return;
+                    }
+                }
+            } catch (permErr) {
+                // 古い LIFF SDK で permission API が無いケースは fall through して送信を試みる
+                console.warn('liff.permission.query failed, attempting send anyway:', permErr);
+            }
+
+            try {
+                const repName = (cache.userInfo && cache.userInfo.name) || '';
+                const passengers = cache.passengers || 1;
+                const dateJP = formatDateJP(cache.date);
+                const isWaitlist = !!(data && data.isWaitlist);
+                const headerEmoji = isWaitlist ? '⏳' : '🚌';
+                const headerLabel = isWaitlist ? 'キャンセル待ち' : '予約申込';
+                // 1行目: チャット一覧プレビューに表示される要約 (代表者名/日付/人数)
+                // 2行目: ツアー名
+                // 3行目以降: お客さんへの自動送信注記
+                const notifyText =
+                    `${headerEmoji} ${headerLabel}: ${repName}様 / ${dateJP} / ${passengers}名\n` +
+                    `${cache.tourTitle}\n\n` +
+                    `(このメッセージは予約確定時に自動送信されました)`;
+                await liff.sendMessages([{ type: 'text', text: notifyText }]);
+                cache.notifySent = true;
+                console.log('Staff notification sent via liff.sendMessages');
+            } catch (sendErr) {
+                // 失敗しても予約完了フローは止めない
+                console.warn('liff.sendMessages failed (non-blocking):', sendErr);
+            }
+        }
+
         async function submitReservation() {
             if (cache.isSubmitting) {
                 alert("送信中です。お待ちください...");
@@ -1216,6 +1266,9 @@
                                 console.error("画面切り替えエラー:", err);
                             }
                         }, 100);
+                        // スタッフのLINE OA管理画面で新規予約を上位に bump させる通知
+                        // fire-and-forget: 完了画面遷移をブロックしない
+                        notifyStaffViaLiff(data);
                     } catch (parseErr) {
                         console.error("Response parse error:", parseErr);
                         alert("予約処理後のデータ取得に失敗しました。予約が完了している可能性があります。");
