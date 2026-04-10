@@ -749,6 +749,7 @@ function closeModal(modalId) {
     }
     if (modalId === 'modal-add-reservation') {
         resetManualReservationForm();
+        closeCustomerSearchModal();
     }
 }
 
@@ -769,6 +770,83 @@ function resetManualReservationForm() {
     if (discountRow) discountRow.classList.add('hidden');
     var statusSelect = document.getElementById('manual-status');
     if (statusSelect) statusSelect.value = 'confirmed';
+}
+
+// 希望9: 既存顧客から基本情報をコピーして手動予約フォームに入力
+function getUniqueCustomers() {
+    var seen = {};
+    var customers = [];
+    // 新しい予約を優先 (createdAt 降順)
+    var sorted = cachedReservations.slice().sort(function(a, b) {
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+    sorted.forEach(function(r) {
+        if (!r.name) return;
+        var key = r.name.trim();
+        if (seen[key]) return;
+        seen[key] = true;
+        customers.push({
+            name: r.name,
+            phone: r.phone || '',
+            address: r.address || '',
+            lineDisplayName: r.lineDisplayName || ''
+        });
+    });
+    return customers;
+}
+
+function openCustomerSearchModal() {
+    document.getElementById('customer-search-input').value = '';
+    filterCustomerSearchResults();
+    document.getElementById('modal-customer-search').classList.remove('hidden');
+    document.getElementById('customer-search-input').focus();
+}
+
+function closeCustomerSearchModal() {
+    document.getElementById('modal-customer-search').classList.add('hidden');
+}
+
+function filterCustomerSearchResults() {
+    var query = (document.getElementById('customer-search-input').value || '').trim().toLowerCase();
+    var customers = getUniqueCustomers();
+    if (query) {
+        customers = customers.filter(function(c) {
+            return c.name.toLowerCase().indexOf(query) !== -1
+                || c.phone.toLowerCase().indexOf(query) !== -1
+                || c.lineDisplayName.toLowerCase().indexOf(query) !== -1;
+        });
+    }
+    var container = document.getElementById('customer-search-results');
+    if (customers.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 py-4 text-center">該当する顧客が見つかりません</p>';
+        return;
+    }
+    container.innerHTML = customers.slice(0, 50).map(function(c, idx) {
+        var lineName = c.lineDisplayName ? ' <span class="text-gray-400">(' + escapeHtmlAttr(c.lineDisplayName) + ')</span>' : '';
+        return '<button type="button" onclick="selectCustomerForManual(' + idx + ')" class="w-full text-left p-3 rounded border hover:bg-blue-50 transition-colors"'
+            + ' data-customer-idx="' + idx + '">'
+            + '<div class="font-bold text-sm">' + escapeHtmlAttr(c.name) + lineName + '</div>'
+            + '<div class="text-xs text-gray-500">' + escapeHtmlAttr(c.phone || '電話番号なし') + ' / ' + escapeHtmlAttr(c.address || '住所なし') + '</div>'
+            + '</button>';
+    }).join('');
+}
+
+function selectCustomerForManual(idx) {
+    var query = (document.getElementById('customer-search-input').value || '').trim().toLowerCase();
+    var customers = getUniqueCustomers();
+    if (query) {
+        customers = customers.filter(function(c) {
+            return c.name.toLowerCase().indexOf(query) !== -1
+                || c.phone.toLowerCase().indexOf(query) !== -1
+                || c.lineDisplayName.toLowerCase().indexOf(query) !== -1;
+        });
+    }
+    var c = customers[idx];
+    if (!c) return;
+    document.getElementById('manual-name').value = c.name;
+    document.getElementById('manual-phone').value = c.phone;
+    document.getElementById('manual-address').value = c.address;
+    closeCustomerSearchModal();
 }
 
 function getManualReservationDraft() {
