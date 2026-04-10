@@ -123,9 +123,15 @@ def update_reservation_status(
     seat_pref=None,
     total_price=None,
     progress_log=None,
-    booking_source=None
+    booking_source=None,
+    price_unit_price=None,
+    price_line_discount=None,
+    price_special_discount=None,
+    price_seat_charge=None,
+    price_free_amount=None,
+    price_free_label=None
 ):
-    """予約更新（status / progressStatus / remark / 顧客情報 / 人数 / 乗車地(単数/複数) / 座席 / 金額 / progressLog / bookingSource）"""
+    """予約更新（status / progressStatus / remark / 顧客情報 / 人数 / 乗車地(単数/複数) / 座席 / 金額内訳 / progressLog / bookingSource）"""
     res_doc = db.collection('reservations').document(reservation_id).get()
     if not res_doc.exists:
         return False
@@ -206,6 +212,20 @@ def update_reservation_status(
             normalized_total = max(int(total_price), 0)
             update_payload['totalPrice'] = normalized_total
             update_payload['amount'] = normalized_total
+
+        # 金額内訳フィールド (希望6)
+        if price_unit_price is not None:
+            update_payload['priceUnitPrice'] = int(price_unit_price)
+        if price_line_discount is not None:
+            update_payload['priceLineDiscount'] = int(price_line_discount)
+        if price_special_discount is not None:
+            update_payload['priceSpecialDiscount'] = int(price_special_discount)
+        if price_seat_charge is not None:
+            update_payload['priceSeatCharge'] = int(price_seat_charge)
+        if price_free_amount is not None:
+            update_payload['priceFreeAmount'] = int(price_free_amount)
+        if price_free_label is not None:
+            update_payload['priceFreeLabel'] = str(price_free_label)
 
         # userInfo も整合させる
         if name is not None or phone is not None or address is not None:

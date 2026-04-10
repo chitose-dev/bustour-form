@@ -124,8 +124,110 @@ function normalizeReservation(reservation) {
         createdAt: reservation.createdAt || '',
         progressLog: Array.isArray(reservation.progressLog)
             ? reservation.progressLog
-            : (Array.isArray(reservation.progress_log) ? reservation.progress_log : [])
+            : (Array.isArray(reservation.progress_log) ? reservation.progress_log : []),
+        // 金額内訳 (希望6) — null は「未保存、推算が必要」を示す
+        priceUnitPrice: reservation.priceUnitPrice ?? null,
+        priceLineDiscount: reservation.priceLineDiscount ?? null,
+        priceSpecialDiscount: reservation.priceSpecialDiscount ?? null,
+        priceSeatCharge: reservation.priceSeatCharge ?? null,
+        priceFreeAmount: reservation.priceFreeAmount ?? null,
+        priceFreeLabel: reservation.priceFreeLabel ?? '',
+        isManualEntry: !!reservation.isManualEntry
     };
+}
+
+// 希望6: 金額内訳の推算 (Firestore 未保存の既存予約向け後方互換)
+function inferPriceBreakdown(r) {
+    // Firestore に内訳が保存済みならそのまま返す
+    if (r.priceUnitPrice !== null) {
+        return {
+            unitPrice: r.priceUnitPrice,
+            lineDiscount: r.priceLineDiscount || 0,
+            specialDiscount: r.priceSpecialDiscount || 0,
+            seatCharge: r.priceSeatCharge || 0,
+            freeAmount: r.priceFreeAmount || 0,
+            freeLabel: r.priceFreeLabel || ''
+        };
+    }
+
+    // --- 後方互換: 推算ロジック ---
+    var tour = cachedTours.find(function(t) { return t.id === r.tour_id; });
+
+    // 1. 定価
+    var unitPrice = tour
+        ? Number(tour.listPrice || (Number(tour.price || 0) + 100))
+        : (r.count > 0 ? Math.floor((r.amount + (r.memberDiscountTotal || 0)) / r.count) : 0);
+
+    // 2. LINE割引
+    var isLineSource = ['公式LINE（システム）', '公式LINE（メッセージ）', '個人LINE'].indexOf(r.bookingSource) !== -1;
+    var lineDiscount = (isLineSource && !r.isManualEntry) ? 100 : 0;
+
+    // 3. 特割: 旧 specialMember から推算
+    var specialDiscount = 0;
+    if (r.specialMember && r.count > 0) {
+        specialDiscount = SPECIAL_MEMBER_DISCOUNT_PER_PERSON;
+    }
+
+    // 4. 前席追加
+    var seatCharge = r.seat_pref === 'あり' ? PREFERRED_SEAT_PRICE : 0;
+
+    // 5. フリー金額: 合計値と計算値の差分を吸収
+    var calculatedTotal = (unitPrice - lineDiscount - specialDiscount + seatCharge) * r.count;
+    var freeAmount = 0;
+    if (r.count > 0 && r.amount !== calculatedTotal) {
+        freeAmount = Math.round((r.amount - calculatedTotal) / r.count);
+    }
+
+    return {
+        unitPrice: unitPrice,
+        lineDiscount: lineDiscount,
+        specialDiscount: specialDiscount,
+        seatCharge: seatCharge,
+        freeAmount: freeAmount,
+        freeLabel: ''
+    };
+}
+
+// 希望6: 内訳入力からリアルタイムで合計を再計算
+function recalcBreakdownTotal() {
+    var up = parseInt(document.getElementById('edit-bd-unitprice').value) || 0;
+    var ld = parseInt(document.getElementById('edit-bd-line').value) || 0;
+    var sd = parseInt(document.getElementById('edit-bd-special').value) || 0;
+    var sc = parseInt(document.getElementById('edit-bd-seat').value) || 0;
+    var fa = parseInt(document.getElementById('edit-bd-free').value) || 0;
+    var countEl = document.getElementById('edit-res-count');
+    var count = countEl ? (parseInt(countEl.value) || 1) : 1;
+
+    var perPerson = up - ld - sd + sc + fa;
+    var total = Math.max(perPerson * count, 0);
+
+    var perPersonEl = document.getElementById('edit-bd-perperson');
+    if (perPersonEl) perPersonEl.innerText = '¥' + perPerson.toLocaleString();
+    var totalEl = document.getElementById('edit-bd-total');
+    if (totalEl) totalEl.innerText = '¥' + total.toLocaleString();
+    var amountEl = document.getElementById('edit-res-amount');
+    if (amountEl) amountEl.value = total;
+}
+
+// 希望6: 予約方法変更時にLINE割引を自動設定
+function onBookingSourceChanged() {
+    var source = document.getElementById('edit-res-booking-source').value;
+    var isLine = ['公式LINE（システム）', '公式LINE（メッセージ）', '個人LINE'].indexOf(source) !== -1;
+    var lineInput = document.getElementById('edit-bd-line');
+    if (lineInput) {
+        lineInput.value = isLine ? 100 : 0;
+        recalcBreakdownTotal();
+    }
+}
+
+// 希望6: 前列座席変更時に前席追加を自動設定
+function onSeatPrefChanged() {
+    var seatPref = document.getElementById('edit-res-seat').value;
+    var seatInput = document.getElementById('edit-bd-seat');
+    if (seatInput) {
+        seatInput.value = seatPref === 'あり' ? PREFERRED_SEAT_PRICE : 0;
+        recalcBreakdownTotal();
+    }
 }
 
 function getStatusMeta(statusKey) {
@@ -1298,7 +1400,7 @@ function showReservationDetail(id) {
         + '<div><label class="block text-gray-600 text-sm mb-1">氏名</label><input type="text" id="edit-res-name" class="w-full border p-2 rounded text-sm" value="' + (r.name || '').replace(/"/g, '&quot;') + '"></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">電話番号</label><input type="tel" id="edit-res-phone" class="w-full border p-2 rounded text-sm" value="' + (r.phone || '').replace(/"/g, '&quot;') + '"></div>'
         + '<div><label class="block text-gray-600 text-sm mb-1">住所</label><input type="text" id="edit-res-address" class="w-full border p-2 rounded text-sm" value="' + (r.address || '').replace(/"/g, '&quot;') + '"></div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">人数</label><input type="number" id="edit-res-count" class="w-full border p-2 rounded text-sm" min="1" value="' + r.count + '" oninput="onReservationEditInputsChanged(\'' + r.id + '\')"></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">人数</label><input type="number" id="edit-res-count" class="w-full border p-2 rounded text-sm" min="1" value="' + r.count + '" oninput="recalcBreakdownTotal()"></div>'
         + '<div>'
         + '<div class="flex items-center justify-between mb-1">'
         + '<label class="block text-gray-600 text-sm">乗車地（複数設定可）</label>'
@@ -1310,29 +1412,31 @@ function showReservationDetail(id) {
         + '<div id="edit-res-pickups-container"></div>'
         + '<p class="text-xs text-gray-500 mt-1">乗車地は候補から選択するほか、自由記述も可能（お連れ様名・前席指定・お子様料金などのメモにも使えます）。</p>'
         + '</div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">予約方法</label><select id="edit-res-booking-source" class="w-full border p-2 rounded text-sm bg-white"><option value="公式LINE（システム）"' + (r.bookingSource === '公式LINE（システム）' ? ' selected' : '') + '>公式LINE（システム）</option><option value="公式LINE（メッセージ）"' + (r.bookingSource === '公式LINE（メッセージ）' ? ' selected' : '') + '>公式LINE（メッセージ）</option><option value="個人LINE"' + (r.bookingSource === '個人LINE' ? ' selected' : '') + '>個人LINE</option><option value="電話"' + (r.bookingSource === '電話' ? ' selected' : '') + '>電話</option><option value="WEB直接"' + (r.bookingSource === 'WEB直接' || r.bookingSource === 'Web直接' ? ' selected' : '') + '>WEB直接</option><option value="その他"' + (r.bookingSource === 'その他' ? ' selected' : '') + '>その他</option></select></div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onReservationEditInputsChanged(\'' + r.id + '\')"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
-        + '<div><label class="block text-gray-600 text-sm mb-1">合計金額</label><div class="flex gap-2"><input type="number" id="edit-res-amount" class="w-full border p-2 rounded text-sm" min="0" value="' + r.amount + '"><button type="button" onclick="recalculateReservationAmount(\'' + r.id + '\')" class="px-3 py-2 rounded text-xs bg-gray-100 hover:bg-gray-200 border">自動計算</button></div><p id="edit-res-amount-hint" class="text-xs text-gray-500 mt-1"></p></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">予約方法</label><select id="edit-res-booking-source" class="w-full border p-2 rounded text-sm bg-white" onchange="onBookingSourceChanged()"><option value="公式LINE（システム）"' + (r.bookingSource === '公式LINE（システム）' ? ' selected' : '') + '>公式LINE（システム）</option><option value="公式LINE（メッセージ）"' + (r.bookingSource === '公式LINE（メッセージ）' ? ' selected' : '') + '>公式LINE（メッセージ）</option><option value="個人LINE"' + (r.bookingSource === '個人LINE' ? ' selected' : '') + '>個人LINE</option><option value="電話"' + (r.bookingSource === '電話' ? ' selected' : '') + '>電話</option><option value="WEB直接"' + (r.bookingSource === 'WEB直接' || r.bookingSource === 'Web直接' ? ' selected' : '') + '>WEB直接</option><option value="その他"' + (r.bookingSource === 'その他' ? ' selected' : '') + '>その他</option></select></div>'
+        + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onSeatPrefChanged()"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
+        + (function() { var bd = inferPriceBreakdown(r); return ''
+        + '<div class="mt-2 p-3 border rounded bg-yellow-50 border-yellow-200">'
+        + '<label class="block text-sm font-bold mb-2">金額内訳（1人あたり）</label>'
+        + '<div class="space-y-2">'
+        + '<div class="flex items-center gap-2"><label class="text-gray-600 text-xs w-20 shrink-0">定価</label><input type="number" id="edit-bd-unitprice" class="flex-1 border p-1.5 rounded text-sm" value="' + bd.unitPrice + '" oninput="recalcBreakdownTotal()"><span class="text-xs text-gray-400">円</span></div>'
+        + '<div class="flex items-center gap-2"><label class="text-gray-600 text-xs w-20 shrink-0">LINE割引</label><input type="number" id="edit-bd-line" class="flex-1 border p-1.5 rounded text-sm" min="0" value="' + bd.lineDiscount + '" oninput="recalcBreakdownTotal()"><span class="text-xs text-gray-400">円</span></div>'
+        + '<div class="flex items-center gap-2"><label class="text-gray-600 text-xs w-20 shrink-0">特割</label><input type="number" id="edit-bd-special" class="flex-1 border p-1.5 rounded text-sm" min="0" value="' + bd.specialDiscount + '" oninput="recalcBreakdownTotal()"><span class="text-xs text-gray-400">円</span></div>'
+        + '<div class="flex items-center gap-2"><label class="text-gray-600 text-xs w-20 shrink-0">前席追加</label><input type="number" id="edit-bd-seat" class="flex-1 border p-1.5 rounded text-sm" value="' + bd.seatCharge + '" oninput="recalcBreakdownTotal()"><span class="text-xs text-gray-400">円</span></div>'
+        + '<div class="flex items-center gap-2"><label class="text-gray-600 text-xs w-20 shrink-0">フリー</label><input type="number" id="edit-bd-free" class="w-20 border p-1.5 rounded text-sm" value="' + bd.freeAmount + '" oninput="recalcBreakdownTotal()"><input type="text" id="edit-bd-free-label" class="flex-1 border p-1.5 rounded text-sm" value="' + escapeHtmlAttr(bd.freeLabel) + '" placeholder="内容"></div>'
+        + '</div>'
+        + '<div class="mt-2 pt-2 border-t space-y-1">'
+        + '<div class="flex justify-between text-sm"><span class="text-gray-600">1人あたり</span><span id="edit-bd-perperson" class="font-bold">¥' + (bd.unitPrice - bd.lineDiscount - bd.specialDiscount + bd.seatCharge + bd.freeAmount).toLocaleString() + '</span></div>'
+        + '<div class="flex justify-between text-sm"><span class="text-gray-600">人数</span><span class="font-bold">' + r.count + '名</span></div>'
+        + '<div class="flex justify-between items-center"><span class="text-gray-600 font-bold">合計</span><span id="edit-bd-total" class="text-lg font-bold text-red-600">¥' + r.amount.toLocaleString() + '</span></div>'
+        + '</div>'
+        + '<input type="hidden" id="edit-res-amount" value="' + r.amount + '">'
+        + '</div>'; })()
         + '<div><label class="block text-gray-600 text-sm mb-1">メモ</label><textarea id="edit-res-manual-memo" class="w-full border p-2 rounded text-sm resize-none" rows="3" placeholder="この予約のメモ">' + (r.manualMemo || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') + '</textarea></div>'
         + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
         + '<div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">'
         + '<button onclick="copyBasicInfo(\'' + r.id + '\');" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 rounded text-sm border">基本情報をコピー</button>'
         + '<button onclick="copyReservationConfirmation(\'' + r.id + '\');" class="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-2 rounded text-sm border border-blue-200">予約確認書をコピー</button>'
         + '</div>'
-        + '<hr>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">特別会員</span><span class="font-bold text-sm">' + (r.specialMember ? '適用中' : '未適用') + '</span></div>'
-        + '<div class="flex justify-between"><span class="text-gray-600 text-sm">会員割引</span><span class="font-bold text-sm">-¥' + (r.memberDiscountTotal || 0).toLocaleString() + '</span></div>'
-        + '<div class="flex justify-between items-center"><span class="text-gray-600 text-sm">合計金額</span><span class="font-bold text-lg text-red-600">¥' + r.amount.toLocaleString() + '</span></div>'
-        + '</div>'
-        + '<div class="mt-3 p-3 border rounded bg-white">'
-        + '<label class="flex items-center gap-2 text-sm font-bold">'
-        + '<input type="checkbox" id="detail-special-member" ' + (r.specialMember ? 'checked' : '') + ' ' + (!r.lineUserId || r.status === 'cancelled' ? 'disabled' : '') + '>'
-        + '<span>特別会員（1人あたり300円引き）</span>'
-        + '</label>'
-        + '<p class="text-xs text-gray-500 mt-1">チェックすると、この予約と同じLINE IDの今後予約にも割引を適用します</p>'
-        + (!r.lineUserId ? '<p class="text-xs text-red-500 mt-1">LINE IDが無い予約は特別会員登録できません</p>' : '')
-        + (r.status === 'cancelled' ? '<p class="text-xs text-red-500 mt-1">キャンセル済み予約には特別会員を適用できません</p>' : '')
-        + '<button onclick="updateSpecialMember(\'' + r.id + '\');" ' + (r.status === 'cancelled' ? 'disabled' : '') + ' class="mt-2 w-full bg-blue-50 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 text-blue-700 font-bold py-2 rounded text-sm">会員設定を保存</button>'
         + '</div>'
         + '<div class="mt-3 p-3 border rounded bg-white">'
         + '<label class="block text-sm font-bold mb-2">ステータス変更</label>'
@@ -1366,7 +1470,6 @@ function showReservationDetail(id) {
 
     openModal('modal-reservation-detail');
     initReservationPickupEditor(r);
-    syncReservationAmountByInputs(id, false);
     switchReservationDetailTab('info');
     
     // 顧客メモを非同期で読み込む
@@ -1594,75 +1697,6 @@ function getReservationById(id) {
     return cachedReservations.find(function(x) { return x.id === id; }) || cachedWaitlist.find(function(x) { return x.id === id; }) || null;
 }
 
-function calculateReservationAmountForEdit(reservationId, count, seatPref) {
-    var reservation = getReservationById(reservationId);
-    if (!reservation) return null;
-
-    var tour = cachedTours.find(function(t) { return t.id === reservation.tour_id; });
-    var listPrice = tour ? Number(tour.listPrice || (Number(tour.price || 0) + 100)) : null;
-
-    if (listPrice === null) {
-        var oldCount = Number(reservation.count || 0);
-        var oldSeatCharge = reservation.seat_pref === 'あり' ? oldCount * PREFERRED_SEAT_PRICE : 0;
-        var oldDiscount = Number(reservation.memberDiscountTotal || 0);
-        var oldBaseTotal = Number(reservation.amount || 0) + oldDiscount - oldSeatCharge;
-        listPrice = oldCount > 0 ? Math.max(Math.round(oldBaseTotal / oldCount), 0) : 0;
-    }
-
-    // 割引計算: 有利な方1つのみ
-    // 手動予約(isManualEntry)はLINE割引なし、LINE予約は100円割引
-    var lmEnabled = tour ? !!tour.lastMinuteDiscountEnabled : false;
-    var lmAmount = tour ? Number(tour.lastMinuteDiscountAmount || 0) : 0;
-    var isManual = !!reservation.isManualEntry;
-    var candidates = isManual ? [0] : [MANUAL_PRICE_PLUS_PER_PERSON];
-    if (reservation.specialMember) candidates.push(SPECIAL_MEMBER_DISCOUNT_PER_PERSON);
-    if (lmEnabled && lmAmount > 0) candidates.push(lmAmount);
-    var discountPerPerson = Math.max.apply(null, candidates);
-
-    var seatCharge = seatPref === 'あり' ? count * PREFERRED_SEAT_PRICE : 0;
-    var discount = discountPerPerson * count;
-    var total = Math.max((listPrice - discountPerPerson) * count + seatCharge, 0);
-
-    return {
-        basePerPerson: listPrice,
-        seatCharge: seatCharge,
-        discount: discount,
-        total: total
-    };
-}
-
-function syncReservationAmountByInputs(reservationId, overwriteAmount) {
-    var countInput = document.getElementById('edit-res-count');
-    var seatInput = document.getElementById('edit-res-seat');
-    var amountInput = document.getElementById('edit-res-amount');
-    var hint = document.getElementById('edit-res-amount-hint');
-    if (!countInput || !seatInput || !amountInput || !hint) return;
-
-    var count = parseInt(countInput.value, 10);
-    if (!count || count < 1) count = 1;
-    var seatPref = seatInput.value;
-    var calc = calculateReservationAmountForEdit(reservationId, count, seatPref);
-    if (!calc) return;
-
-    if (overwriteAmount) {
-        amountInput.value = calc.total;
-    }
-
-    hint.innerText = '自動計算: 基本 ¥' + calc.basePerPerson.toLocaleString()
-        + ' × ' + count
-        + ' + 座席 ¥' + calc.seatCharge.toLocaleString()
-        + (calc.discount > 0 ? ' - 会員割引 ¥' + calc.discount.toLocaleString() : '')
-        + ' = ¥' + calc.total.toLocaleString();
-}
-
-function onReservationEditInputsChanged(id) {
-    syncReservationAmountByInputs(id, true);
-}
-
-function recalculateReservationAmount(id) {
-    syncReservationAmountByInputs(id, true);
-}
-
 function copyBasicInfo(id) {
     var r = getReservationById(id);
     if (!r) return;
@@ -1788,7 +1822,14 @@ async function saveReservationEdit(id) {
             seatPref: seatPref,
             totalPrice: totalPrice,
             bookingSource: bookingSource,
-            manualMemo: manualMemo
+            manualMemo: manualMemo,
+            // 金額内訳 (希望6)
+            priceUnitPrice: parseInt(document.getElementById('edit-bd-unitprice').value) || 0,
+            priceLineDiscount: parseInt(document.getElementById('edit-bd-line').value) || 0,
+            priceSpecialDiscount: parseInt(document.getElementById('edit-bd-special').value) || 0,
+            priceSeatCharge: parseInt(document.getElementById('edit-bd-seat').value) || 0,
+            priceFreeAmount: parseInt(document.getElementById('edit-bd-free').value) || 0,
+            priceFreeLabel: (document.getElementById('edit-bd-free-label').value || '').trim()
         };
 
         var res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
@@ -1809,45 +1850,6 @@ async function saveReservationEdit(id) {
         await loadInitialData();
         showReservationDetail(id);
         alert('予約情報を更新しました');
-    } catch (err) {
-        console.error(err);
-        alert('通信エラーが発生しました');
-    }
-}
-
-async function updateSpecialMember(id) {
-    const checkbox = document.getElementById('detail-special-member');
-    if (!checkbox) return;
-
-    const target = cachedReservations.find(function(r) { return r.id === id; }) || cachedWaitlist.find(function(r) { return r.id === id; });
-    if (target && target.status === 'cancelled') {
-        alert('キャンセル済み予約には特別会員を適用できません');
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
-            method: 'PATCH',
-            headers: {
-                ...getAuthHeaders(),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ specialMember: checkbox.checked })
-        });
-
-        if (!res.ok) {
-            const errorBody = await res.json().catch(() => ({}));
-            if (errorBody.error === 'cancelled reservation cannot apply special member') {
-                alert('キャンセル済み予約には特別会員を適用できません');
-            } else {
-                alert(errorBody.error || '特別会員の更新に失敗しました');
-            }
-            return;
-        }
-
-        await loadInitialData();
-        showReservationDetail(id);
-        alert('特別会員設定を更新しました');
     } catch (err) {
         console.error(err);
         alert('通信エラーが発生しました');
