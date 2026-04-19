@@ -435,42 +435,67 @@ function escapeHtmlAttr(value) {
         .replace(/'/g, '&#39;');
 }
 
-// 乗車地のオプションリストを <datalist> 用に生成 (希望4: input + datalist で自由記述可能)
-function buildPickupDatalistOptions() {
-    var names = getActivePickupNames();
-    return names.map(function(name) {
-        return '<option value="' + escapeHtmlAttr(name) + '">';
-    }).join('');
+// 正規化 (NFKC + trim) して表記ゆれを吸収
+function normalizePickupName(value) {
+    return String(value == null ? '' : value).normalize('NFKC').trim();
 }
 
-function ensurePickupDatalist() {
-    var existing = document.getElementById('edit-res-pickup-datalist');
-    if (existing) {
-        existing.innerHTML = buildPickupDatalistOptions();
-        return;
+// 既存値が active pickup 名と一致するかを正規化込みで判定し、一致すれば master 側の表記を返す
+function matchActivePickupName(rawValue) {
+    var target = normalizePickupName(rawValue);
+    if (!target) return null;
+    var names = getActivePickupNames();
+    for (var i = 0; i < names.length; i++) {
+        if (normalizePickupName(names[i]) === target) return names[i];
     }
-    var dl = document.createElement('datalist');
-    dl.id = 'edit-res-pickup-datalist';
-    dl.innerHTML = buildPickupDatalistOptions();
-    document.body.appendChild(dl);
+    return null;
 }
 
 function buildPickupRowHtml(selectedValue, index) {
+    var raw = selectedValue == null ? '' : String(selectedValue);
+    var matched = matchActivePickupName(raw);
+    var isOther = raw !== '' && matched === null;
+    var selectValue = matched !== null ? matched : (isOther ? '__other__' : '');
+    var otherValue = isOther ? raw : '';
+    var otherStyle = isOther ? '' : 'display:none';
+
+    var optionsHtml = '<option value="">選択してください</option>'
+        + getActivePickupNames().map(function(name) {
+            var sel = (name === matched) ? ' selected' : '';
+            return '<option value="' + escapeHtmlAttr(name) + '"' + sel + '>' + escapeHtmlAttr(name) + '</option>';
+        }).join('')
+        + '<option value="__other__"' + (selectValue === '__other__' ? ' selected' : '') + '>その他（自由入力）</option>';
+
     return '<div class="flex gap-2 items-center mb-2" data-pickup-row="1">'
         + '<span class="text-xs text-gray-500 w-12">' + (index + 1) + '人目</span>'
-        + '<input type="text" class="edit-res-pickup-item flex-1 border p-2 rounded text-sm bg-white"'
-        + ' list="edit-res-pickup-datalist"'
-        + ' placeholder="乗車地・お連れ様名・前席指定など"'
-        + ' value="' + escapeHtmlAttr(selectedValue) + '">'
+        + '<select class="edit-res-pickup-select flex-1 border p-2 rounded text-sm bg-white">'
+        + optionsHtml
+        + '</select>'
+        + '<input type="text" class="edit-res-pickup-other flex-1 border p-2 rounded text-sm bg-white"'
+        + ' placeholder="自由入力 (例: お連れ様名・前席指定など)"'
+        + ' value="' + escapeHtmlAttr(otherValue) + '"'
+        + ' style="' + otherStyle + '">'
         + '<button type="button" onclick="removeReservationPickupRow(this)" class="px-3 py-2 rounded text-xs border bg-white hover:bg-gray-50">削除</button>'
         + '</div>';
+}
+
+// 行から現在値を読む (select = __other__ のときは自由入力欄の値、そうでなければ select の値)
+function readPickupRowValue(row) {
+    if (!row) return '';
+    var sel = row.querySelector('.edit-res-pickup-select');
+    var other = row.querySelector('.edit-res-pickup-other');
+    if (!sel) return '';
+    if (sel.value === '__other__') {
+        return (other ? other.value : '').trim();
+    }
+    return sel.value;
 }
 
 function initReservationPickupEditor(reservation) {
     var container = document.getElementById('edit-res-pickups-container');
     if (!container) return;
 
-    ensurePickupDatalist();
+    ensurePickupRowDelegation(container);
 
     var rawPickups = Array.isArray(reservation.pickups) ? reservation.pickups.filter(Boolean) : [];
     var resolvedPickups = rawPickups.map(resolvePickupName).filter(Boolean);
@@ -525,8 +550,8 @@ function fillPickupRowsByCount() {
     var count = parseInt(countInput.value, 10);
     if (!count || count < 1) count = 1;
 
-    var currentValues = Array.from(container.querySelectorAll('.edit-res-pickup-item')).map(function(el) {
-        return el.value || '';
+    var currentValues = Array.from(container.querySelectorAll('[data-pickup-row="1"]')).map(function(row) {
+        return readPickupRowValue(row);
     });
     var first = currentValues[0] || '';
     var nextValues = [];
@@ -540,10 +565,32 @@ function fillPickupRowsByCount() {
 }
 
 function getEditedPickupValues() {
-    var values = Array.from(document.querySelectorAll('.edit-res-pickup-item')).map(function(el) {
-        return (el.value || '').trim();
-    }).filter(Boolean);
-    return values;
+    var rows = Array.from(document.querySelectorAll('#edit-res-pickups-container [data-pickup-row="1"]'));
+    return rows.map(readPickupRowValue)
+        .map(function(v) { return (v || '').trim(); })
+        .filter(Boolean);
+}
+
+// container 1 個に対して select change の delegated listener を 1 回だけ付ける
+function ensurePickupRowDelegation(container) {
+    if (!container || container.dataset.pickupDelegated === '1') return;
+    container.addEventListener('change', function(e) {
+        var target = e.target;
+        if (!target || !target.classList || !target.classList.contains('edit-res-pickup-select')) return;
+        var row = target.closest('[data-pickup-row="1"]');
+        if (!row) return;
+        var other = row.querySelector('.edit-res-pickup-other');
+        if (!other) return;
+        if (target.value === '__other__') {
+            other.style.display = '';
+            other.focus();
+        } else {
+            // value は保持 (誤操作で select を動かしても元に戻せるように)。
+            // readPickupRowValue は select !== '__other__' のとき input を参照しないので保存値は select の値で確定する。
+            other.style.display = 'none';
+        }
+    });
+    container.dataset.pickupDelegated = '1';
 }
 
 function sortToursByDateAsc(a, b) {
