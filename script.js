@@ -1171,20 +1171,30 @@ function loadReservations() {
         return matchTour && matchDate && matchStatus;
     });
 
-    // ソート
+    // ソート（同値の場合は createdAt を tie-breaker に使い、API 返却順が漏れないようにする）
     var sortKey = document.getElementById('filter-sort') ? document.getElementById('filter-sort').value : 'createdAt';
+    var cmpCreatedAsc = function(a, b) { return (a.createdAt || '').localeCompare(b.createdAt || ''); };
+    var cmpCreatedDesc = function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); };
+    var cmpDateAsc = function(a, b) { return (a.date || '').localeCompare(b.date || ''); };
     if (sortKey === 'tourDate') {
-        filtered.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
+        filtered.sort(function(a, b) {
+            return cmpDateAsc(a, b) || cmpCreatedAsc(a, b);
+        });
     } else if (sortKey === 'status') {
         var statusOrder = { pending: 0, confirmed: 1, waitlist: 2, cancelled: 3 };
-        filtered.sort(function(a, b) { return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0); });
+        var statusRank = function(s) { return statusOrder[s] != null ? statusOrder[s] : 99; };
+        filtered.sort(function(a, b) {
+            return (statusRank(a.status) - statusRank(b.status)) || cmpCreatedDesc(a, b);
+        });
     } else if (sortKey === 'pickup') {
         filtered.sort(function(a, b) {
-            return formatPickupsDisplay(a).localeCompare(formatPickupsDisplay(b));
+            return formatPickupsDisplay(a).localeCompare(formatPickupsDisplay(b))
+                || cmpDateAsc(a, b)
+                || cmpCreatedAsc(a, b);
         });
     } else {
         // createdAt: 申込日順（新しい順） — デフォルト
-        filtered.sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+        filtered.sort(cmpCreatedDesc);
     }
 
     let totalPeople = 0;
