@@ -63,6 +63,18 @@ function formatDateTimeForJstDisplay(dateValue) {
     return p.year + '/' + p.month + '/' + p.day + ' ' + p.hour + ':' + p.minute;
 }
 
+function formatYen(amount) {
+    return '¥' + (Number(amount) || 0).toLocaleString();
+}
+
+function getPerPersonAmountText(totalAmount, count) {
+    var total = Number(totalAmount) || 0;
+    var people = Number(count) || 0;
+    if (people <= 0) return '-';
+    if (total % people === 0) return formatYen(total / people);
+    return formatYen(Math.floor(total / people)) + ' 余り' + (total % people).toLocaleString() + '円';
+}
+
 function getAuthHeaders() {
     return { Authorization: `Bearer ${currentAuthToken}` };
 }
@@ -188,7 +200,7 @@ function inferPriceBreakdown(r) {
     };
 }
 
-// 希望6: 内訳入力からリアルタイムで合計を再計算
+// 希望6: 内訳入力からリアルタイムで参考合計を再計算
 function recalcBreakdownTotal() {
     var up = parseInt(document.getElementById('edit-bd-unitprice').value) || 0;
     var ld = parseInt(document.getElementById('edit-bd-line').value) || 0;
@@ -203,10 +215,44 @@ function recalcBreakdownTotal() {
 
     var perPersonEl = document.getElementById('edit-bd-perperson');
     if (perPersonEl) perPersonEl.innerText = '¥' + perPerson.toLocaleString();
+    var countDisplayEl = document.getElementById('edit-bd-count-display');
+    if (countDisplayEl) countDisplayEl.innerText = count + '名';
     var totalEl = document.getElementById('edit-bd-total');
     if (totalEl) totalEl.innerText = '¥' + total.toLocaleString();
-    var amountEl = document.getElementById('edit-res-amount');
-    if (amountEl) amountEl.value = total;
+    var diffEl = document.getElementById('edit-final-total-diff');
+    var finalTotalInput = document.getElementById('edit-res-final-total');
+    if (diffEl && finalTotalInput) {
+        var finalTotal = parseInt(finalTotalInput.value, 10);
+        if (isNaN(finalTotal)) {
+            diffEl.innerText = '最終合計金額を入力してください';
+            diffEl.className = 'mt-1 text-xs text-red-600';
+        } else if (finalTotal === total) {
+            diffEl.innerText = '参考計算額と一致しています';
+            diffEl.className = 'mt-1 text-xs text-green-700';
+        } else {
+            var diff = finalTotal - total;
+            diffEl.innerText = '参考計算額との差額: ' + (diff >= 0 ? '+' : '-') + '¥' + Math.abs(diff).toLocaleString();
+            diffEl.className = 'mt-1 text-xs text-amber-700';
+        }
+    }
+    updateFinalTotalPerPerson();
+}
+
+function applyBreakdownTotalToFinalTotal() {
+    var totalText = document.getElementById('edit-bd-total');
+    var finalTotalInput = document.getElementById('edit-res-final-total');
+    if (!totalText || !finalTotalInput) return;
+    var normalized = totalText.innerText.replace(/[^\d]/g, '');
+    finalTotalInput.value = normalized || '0';
+    recalcBreakdownTotal();
+}
+
+function updateFinalTotalPerPerson() {
+    var finalTotalInput = document.getElementById('edit-res-final-total');
+    var countInput = document.getElementById('edit-res-count');
+    var perPersonEl = document.getElementById('edit-final-total-perperson');
+    if (!finalTotalInput || !countInput || !perPersonEl) return;
+    perPersonEl.innerText = getPerPersonAmountText(parseInt(finalTotalInput.value, 10), parseInt(countInput.value, 10));
 }
 
 // 希望6: 予約方法変更時にLINE割引を自動設定
@@ -1158,7 +1204,7 @@ function downloadCSV() {
                         : '発送';
         const tourObj = cachedTours.find(function(t) { return t.id === r.tour_id; });
         const tourName = tourObj ? tourObj.title : r.tour_name;
-        const unitPrice = r.count > 0 ? Math.floor(r.amount / r.count) : 0;
+        const unitPrice = r.count > 0 && r.amount % r.count === 0 ? (r.amount / r.count) : '';
         // 希望12: 人数分の行に展開
         var pickupsList = Array.isArray(r.pickups) ? r.pickups : [];
         var count = Math.max(r.count, 1);
@@ -1473,7 +1519,8 @@ function showReservationDetail(id) {
         + '<div><label class="block text-gray-600 text-sm mb-1">前列座席指定</label><select id="edit-res-seat" class="w-full border p-2 rounded text-sm bg-white" onchange="onSeatPrefChanged()"><option value="なし"' + (r.seat_pref !== 'あり' ? ' selected' : '') + '>なし</option><option value="あり"' + (r.seat_pref === 'あり' ? ' selected' : '') + '>あり</option></select></div>'
         + (function() { var bd = inferPriceBreakdown(r); return ''
         + '<div class="mt-2 p-3 border rounded bg-yellow-50 border-yellow-200">'
-        + '<label class="block text-sm font-bold mb-2">金額内訳（1人あたり）</label>'
+        + '<label class="block text-sm font-bold mb-1">金額内訳（1人あたり・参考計算）</label>'
+        + '<p class="text-xs text-gray-600 mb-2">請求・台帳・CSV・予約確認書には下の「最終合計金額」を使用します。</p>'
         + '<div class="space-y-2">'
         + '<div class="flex items-center gap-2"><label class="text-gray-600 text-xs w-20 shrink-0">定価</label><input type="number" id="edit-bd-unitprice" class="flex-1 border p-1.5 rounded text-sm" value="' + bd.unitPrice + '" oninput="recalcBreakdownTotal()"><span class="text-xs text-gray-400">円</span></div>'
         + '<div class="flex items-center gap-2"><label class="text-gray-600 text-xs w-20 shrink-0">LINE割引</label><input type="number" id="edit-bd-line" class="flex-1 border p-1.5 rounded text-sm" min="0" value="' + bd.lineDiscount + '" oninput="recalcBreakdownTotal()"><span class="text-xs text-gray-400">円</span></div>'
@@ -1483,10 +1530,17 @@ function showReservationDetail(id) {
         + '</div>'
         + '<div class="mt-2 pt-2 border-t space-y-1">'
         + '<div class="flex justify-between text-sm"><span class="text-gray-600">1人あたり</span><span id="edit-bd-perperson" class="font-bold">¥' + (bd.unitPrice - bd.lineDiscount - bd.specialDiscount + bd.seatCharge + bd.freeAmount).toLocaleString() + '</span></div>'
-        + '<div class="flex justify-between text-sm"><span class="text-gray-600">人数</span><span class="font-bold">' + r.count + '名</span></div>'
-        + '<div class="flex justify-between items-center"><span class="text-gray-600 font-bold">合計</span><span id="edit-bd-total" class="text-lg font-bold text-red-600">¥' + r.amount.toLocaleString() + '</span></div>'
+        + '<div class="flex justify-between text-sm"><span class="text-gray-600">人数</span><span id="edit-bd-count-display" class="font-bold">' + r.count + '名</span></div>'
+        + '<div class="flex justify-between items-center"><span class="text-gray-600 font-bold">参考計算額</span><span id="edit-bd-total" class="text-lg font-bold text-red-600">¥' + ((bd.unitPrice - bd.lineDiscount - bd.specialDiscount + bd.seatCharge + bd.freeAmount) * r.count).toLocaleString() + '</span></div>'
         + '</div>'
-        + '<input type="hidden" id="edit-res-amount" value="' + r.amount + '">'
+        + '<button type="button" onclick="applyBreakdownTotalToFinalTotal()" class="mt-2 w-full bg-white hover:bg-gray-50 text-gray-700 font-bold py-2 rounded text-sm border">参考計算額を最終合計に反映</button>'
+        + '</div>'
+        + '<div class="p-3 border rounded bg-red-50 border-red-200">'
+        + '<label class="block text-sm font-bold mb-1">最終合計金額</label>'
+        + '<p class="text-xs text-gray-600 mb-2">実際に請求・案内する正しい合計金額です。人数で割り切れない金額もそのまま保存できます。</p>'
+        + '<div class="flex items-center gap-2"><input type="number" id="edit-res-final-total" class="flex-1 border p-2 rounded text-lg font-bold" min="0" value="' + r.amount + '" oninput="recalcBreakdownTotal()" required><span class="text-xs text-gray-500">円</span></div>'
+        + '<div class="mt-2 flex justify-between text-sm"><span class="text-gray-600">1人あたり目安</span><span id="edit-final-total-perperson" class="font-bold">' + getPerPersonAmountText(r.amount, r.count) + '</span></div>'
+        + '<div id="edit-final-total-diff" class="mt-1 text-xs text-gray-600"></div>'
         + '</div>'; })()
         + '<div><label class="block text-gray-600 text-sm mb-1">メモ</label><textarea id="edit-res-manual-memo" class="w-full border p-2 rounded text-sm resize-none" rows="3" placeholder="この予約のメモ">' + (r.manualMemo || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') + '</textarea></div>'
         + '<button onclick="saveReservationEdit(\'' + r.id + '\');" class="mt-2 w-full bg-primary hover:bg-primary-hover text-black font-bold py-2 rounded text-sm">予約情報を保存</button>'
@@ -1528,6 +1582,7 @@ function showReservationDetail(id) {
     openModal('modal-reservation-detail');
     initReservationPickupEditor(r);
     switchReservationDetailTab('info');
+    recalcBreakdownTotal();
     
     // 顧客メモを非同期で読み込む
     if (r.lineUserId) {
@@ -1831,7 +1886,7 @@ async function saveReservationEdit(id) {
     var addressInput = document.getElementById('edit-res-address');
     var countInput = document.getElementById('edit-res-count');
     var seatInput = document.getElementById('edit-res-seat');
-    var amountInput = document.getElementById('edit-res-amount');
+    var amountInput = document.getElementById('edit-res-final-total');
     var bookingSourceInput = document.getElementById('edit-res-booking-source');
     var manualMemoInput = document.getElementById('edit-res-manual-memo');
 
